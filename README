@@ -1,0 +1,55 @@
+vim-liteRunner plugin v0.1 
+
+Creator: Junichi OKADOME  <tome@tomesoft.net>
+
+Supports edit-run-edit cycle
+
+In default, shebang (#!...) line in your editing file is used to run it, if exists.
+
+Usage:
+ 1. You can put this stuffs into ~/.vim/plugin/.
+ 2. Add line to be loaded to your ~/.vimrc
+    :runtime plugin/literunner
+ 3. In editing your script, key-in <Leader>g (in default, <Leader> mapped
+    to backslash '\') runs your script and the result is shown in output window.
+ 4. If you need to pass some command line arguments when run it, key-in
+    <Leader>G, cusor then cusor jumps into command line
+     :LRRunscript 
+    input arguments (e.g. --help) and key-in return to run with the
+    arguments.
+     :LRRunscript --help
+    (is evaluated like as /usr/bin/env python myscript.py --help)
+ 5. The specified arguments (in Step 4) are held (in buffer locally), and that
+    will be re-used on next run with <Leader>g until change them (using
+    <Leader>G) or finish editing.
+ 
+Customize:
+ 1. Key Mappings
+ You can change mappings, as you like;
+  :noremap <Leader>g :LRRunScriptWithHeldArguments<CR>
+  :noremap <Leader>G :<C-\>e("LRRunScript " . LiteRunner#ExpandHeldScriptArguments())<CR>
+ These 2 lines should be put before the line 'runtime plugin/literunner',
+ to avoid multiple mapping.
+   
+ 2. Some variables are for customization, their prefix is g:liteRunner_XXX.
+ TODO: explains each items
+ g:liteRunner_tries_to_use_shebang=0 (bool=0,1)
+ g:liteRunner_uses_quickfix_on_error=1 (bool=0,1)
+ g:liteRunner_shows_quickfix_on_error=1 (bool=0,1)
+ g:liteRunner_checks_errors_always=0 (bool=0,1)
+ g:liteRunner_windowheight_default=5 (num)
+ g:liteRunner_windowheight_max=10 (num)
+ g:liteRunner_ftyps_cmds_dict={dict of defaults} (dict)
+ g:liteRunner_prognames_efms_dict={dictjmap of defaults}
+
+ 3. Some functions are for customization, their prefix is LiteRunner#XXX
+ TODO: explains each item
+ LiteRunner#UpdateFtypsCmdsEntry(key, value)
+ LiteRunner#UpdateFtypsEfmsEntry(key, value)
+ LiteRunner#ExpandHeldScriptArguments()
+
+ChangeLog:
+2011-05-25  Junichi OKADOME  <tome@tomesoft.net>
+    * NEW newly created and versioned v0.1
+      tested on MacOSX Vim7.3
+
