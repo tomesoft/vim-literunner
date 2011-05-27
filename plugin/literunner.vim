@@ -1,7 +1,7 @@
 "
 " liteRunner plugin v0.1 (tome@tomesoft.net)
 "
-" Supports edit-run-edit cycle
+" Supports edit-run-edit cycle of your scripting
 "
 " In default, shebang (#!...) line in your editing file is used to run it, if exists.
 "
@@ -82,18 +82,26 @@ if !exists("g:liteRunner_windowheight_max")
     let g:liteRunner_windowheight_max=10
 endif
 
+" ConqueTerm Command
+if !exists("g:liteRunner_ConqueTerm_command") && exists(":ConqueTerm")
+    let g:liteRunner_ConqueTerm_command='ConqueTermSplit'
+endif
+
+let g:liteRunner_ConqueTerm_reexec_always=1
+let g:liteRunner_ConqueTerm_contents_passing_mode=0
+
 "
-" dictionary of filetypes and cmds
-" key=filetype : value=[command-str (,header-string-ofbuffer)]
+" dictionary of filetypes and commands
+" key=filetype : value=[command-str, command-str-of-interactive]
 " typically, editing file path is concatenated after command with whitespace.
 " if (%) in command string, it replaced with editing file path.
 " e.g. script -i=(%) --dir=(%:h)
 if !exists("g:liteRunner_ftyps_cmds_dict")
     let g:liteRunner_ftyps_cmds_dict={
-        \"scheme": ["/usr/bin/env gosh -i"],
+        \"scheme": ["/usr/bin/env gosh", "/usr/bin/env gosh -i"],
         \"perl": ["/usr/bin/env perl"],
         \"python": ["/usr/bin/env python"],
-        \"ruby": ["/usr/bin/env ruby"],
+        \"ruby": ["/usr/bin/env ruby", "/usr/bin/env irb"],
         \"lua": ["/usr/bin/env lua"],
         \"php": ["/usr/bin/env php"],
         \"sh": ["/usr/bin/env sh"],
@@ -104,10 +112,11 @@ if !exists("g:liteRunner_ftyps_cmds_dict")
     elseif has('win32')
         " TODO: for win32 settings here
         let g:liteRunner_ftyps_cmds_dict={
-            \"scheme": ["gosh -i"],
+            \"scheme": ["gosh", "gosh -i"],
             \"perl": ["perl"],
             \"python": ["python"],
-            \"ruby": ["ruby"],
+            \"ruby": ["ruby", "irb"],
+            \"lua": ["lua"]
             \"php": ["php"],
             \}
     endif
@@ -193,11 +202,18 @@ endfunction
 "
 " mappings
 "
+if !hasmapto('LRRunScriptInteractively')
+    if mapcheck('<Leader>i') == ''
+        :noremap <Leader>i :LRRunScriptInteractively<CR>
+    endif
+endif
+
 if !hasmapto('LRRunScriptWithHeldArguments')
     if mapcheck('<Leader>g') == ''
         :noremap <Leader>g :LRRunScriptWithHeldArguments<CR>
     endif
 endif
+
 if !hasmapto('LRRunScript ')
     if mapcheck('<Leader>G') == ''
         :noremap <Leader>G :<C-\>e("LRRunScript " . LiteRunner#ExpandHeldScriptArguments())<CR>
@@ -211,7 +227,7 @@ endif
 command! -nargs=* LRRunScript :call s:RunScript(<q-args>)
 command! -nargs=0 LRRunScriptWithHeldArguments :call s:RunScriptWithHeldArguments()
 command! -nargs=0 LREditHeldArguments :call s:EditHeldArgumentsInCmdline()
-
+command! -nargs=0 LRRunScriptInteractively :call s:RunScriptInteractively()
 
 
 "
@@ -238,67 +254,78 @@ function! s:EditHeldArgumentsInCmdline()
     let b:liteRunner_held_script_arguments = split(intxt)
 endfunction
 
-
+" RunScript function called via Command
 function! s:RunScript(...)
     " save arguments to use later in RunScriptWithHeldArguments()
     let b:liteRunner_held_script_arguments=a:000
-    call s:RunScriptImpl(b:liteRunner_held_script_arguments)
+    call s:RunScriptImpl(b:liteRunner_held_script_arguments, 0)
 endfunction
 
+" RunScriptWithHeldArguments function called via Command
 function! s:RunScriptWithHeldArguments()
     if exists("b:liteRunner_held_script_arguments")
         let arg=b:liteRunner_held_script_arguments
         if type(arg) == type([])
-            call s:RunScriptImpl(arg)
+            call s:RunScriptImpl(arg, 0)
         else
-            call s:RunScriptImp([ arg ]) "(list arg) ->[arg]
+            call s:RunScriptImpl([ arg ], 0) "(list arg) ->[arg]
         endif
     else
-        call s:RunScriptImpl([])
+        call s:RunScriptImpl([], 0)
     endif
 endfunction
 
-function! s:RunScriptImpl(lsargs)
-    let l:consumed = 0
+" RunScriptInteractively function calld via Command
+function! s:RunScriptInteractively()
+    call s:RunScriptImpl([], 1)
+endfunction
+
+" analyze the shebang line and returns their command line string
+function! s:GetShebangCommand()
+    let cmd = ''
+    let line=getline(1)
+    if line =~ '^#!'
+        let lstoken=split(line[2:])
+        if len(lstoken) == 0
+            let cmd='/usr/bin/env sh'
+        else
+            let cmd=join(lstoken, ' ')
+        endif
+    endif
+    return cmd
+endfunction
+
+function! s:GetCommandListFromFtypsCmdsDict()
+    return get(g:liteRunner_ftyps_cmds_dict, &filetype, [])
+endfunction
+
+"
+function! s:RunScriptImpl(lsargs, interactively)
+    let cmd = ''
     if g:liteRunner_tries_to_use_shebang
         "try to find shebang #! of current buffer
-        let line=getline(1)
-        if line =~ '^#!'
-            let lstoken=split(line[2:])
-            if len(lstoken) == 0
-                let cmd='/usr/bin/env sh'
-                let bufhdr='sh'
-            else
-                let lscmd=split(lstoken[0], '/')
-                if lscmd[-1] == 'env'
-                    let bufhdr=lstoken[1]
-                else
-                    let bufhdr=lscmd[-1]
-                endif
-                let cmd=join(lstoken, ' ')
-            endif
-            call s:RunCurrentBufferAsScript(cmd, bufhdr, a:lsargs)
-            let consumed =1
-        endif
+        let cmd = s:GetShebangCommand()
     endif
 
     "shebang not found or not tried
-    if !consumed
-        call s:RunScriptWithFileType(a:lsargs)
+    if cmd == ''
+        let lstcmd=s:GetCommandListFromFtypsCmdsDict()
+        if empty(lstcmd)
+            echohl WarningMsg | echo "cannot run the typeof " . (&filetype ? &filetype : '*None*') | echohl None
+        else
+            let cmd = get(lstcmd, (a:interactively? 1 : 0), lstcmd[0] 
+        endif
     endif
-endfunction
 
-"
-" run script with filetype function
-"
-function! s:RunScriptWithFileType(lsargs)
-    let ftyp = &filetype
-    let lstcmd = get(g:liteRunner_ftyps_cmds_dict, ftyp, [])
-    if empty(lstcmd)
-        echohl WarningMsg | echo "cannot run the typeof " . (ftyp ? ftype : '*None*') | echohl None
-    else
-        let bufhdr = get(lstcmd, 1, s:GetProgname(lstcmd[0]))
-        call s:RunCurrentBufferAsScript(lstcmd[0], bufhdr, a:lsargs)
+    if cmd != ''
+        let bufhdr = s:GetProgname(cmd)
+        if a:interactively
+            "TODO: implement here
+            call s:RunCurrentBufferInteractively(cmd, bufhdr, a:lsargs)
+        else
+            call s:RunCurrentBufferAsScript(cmd, bufhdr, a:lsargs)
+        endif
+        let consumed =1
     endif
 endfunction
 
@@ -311,7 +338,7 @@ function! s:RunCurrentBufferAsScript(cmd, bufheader, lsargs)
     let fpath=expand("%")
     let fname=expand("%:t")
     if fname == ""
-        echohl WarningMsg | echo "save first!!" | echohl None
+        echohl WarningMsg | echo "save at first!!" | echohl None
     else
         let buftitle = "[" . buftitle . "][" . fname . "]"
         w%
@@ -319,7 +346,73 @@ function! s:RunCurrentBufferAsScript(cmd, bufheader, lsargs)
     endif
 endfunction
 
-" get progname from cmdline string
+" if an interactive buffer (which is tied to current buffer) is alive,
+" returns bufnr, otherwise returns 0
+function! s:GetAliveInteraciveBufferNumber()
+    if exists("b:liteRunner_interactive_bufnr")
+                \ && buflisted(b:liteRunner_interactive_bufnr)
+                \ && bufloaded(b:liteRunner_interactive_bufnr)
+        return b:liteRunner_interactive_bufnr
+    endif
+    return 0
+endfunction
+
+function! s:PrepareInteractiveBuffer(cmd)
+    let cbufno = bufnr("%")
+    let ibufno = s:GetAliveInteraciveBufferNumber()
+    if ibufno
+        let idx=getbufvar(cbufno, "liteRunner_conque_term_index")
+        if !empty(idx)
+            let conq = conque_term#get_instance(idx)
+            if !empty(conq) && get(conq, 'active', 0)
+                        \ && (get(conq, 'command', '') == a:cmd)
+                "already alive
+                if !g:liteRunner_ConqueTerm_reexec_always
+                    return [ibufno,idx] "reuse
+                endif
+                "call conq.close() " happens mapping errors
+            endif
+        endif
+        execute ibufno."bwipeout!"
+        let ibufno = 0
+    endif
+
+    if !ibufno
+        if exists("g:liteRunner_ConqueTerm_command")
+            execute g:liteRunner_ConqueTerm_command . ' ' . a:cmd
+        endif
+        " if buffer moved, that is succeeded to execute the program (maybe)
+        if cbufno != bufnr("%")
+            let ibufno = bufnr("%")
+            call setbufvar(cbufno, "liteRunner_interactive_bufnr", ibufno)
+            let idx = get(conque_term#get_instance(), 'idx', 0)
+            call setbufvar(cbufno, "liteRunner_conque_term_index", idx)
+            return [ibufno, idx]
+        endif
+    endif
+
+    return []
+endfunction
+
+"
+" run contents of current buffer interactively
+"
+function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs)
+    "TODO: responding to visual mode
+    let lslines = getline(s:GetShebangCommand() != '' ? 2 : 1, '$')
+    "check the interactive buffer alive
+    let lbufspec = s:PrepareInteractiveBuffer(a:cmd)
+    if !empty(lbufspec)
+        " do input
+        let conq = conque_term#get_instance(lbufspec[1])
+        if !empty(conq)
+            call conq.read(100)
+            for ln in lslines | call conq.writeln(ln) | call conq.read(1) | endfor
+        endif
+    endif
+endfunction
+
+" get program name from cmdline string
 " e.g '/usr/local/bin/python2.3' -> python2.3
 " e.g '/usr/bin/env python' -> python
 " e.g 'python3.2.exe' -> python3.2
@@ -402,7 +495,7 @@ function! s:RunScriptFile(cmd, fpath, buftitle, lsargs)
     let buftitle=a:buftitle
     let buftitle0=fnameescape(buftitle)
     let bufno = s:FindBufferWithTitle(buftitle)
-    if bufno > 0
+    if bufno > 0 && bufexists(bufno)
         execute bufno."bdelete!"
     endif
 
