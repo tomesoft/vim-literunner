@@ -123,7 +123,7 @@ if !exists("g:liteRunner_ftyps_cmds_dict")
             \"perl": ["perl"],
             \"python": ["python"],
             \"ruby": ["ruby", "irb"],
-            \"lua": ["lua"]
+            \"lua": ["lua"],
             \"php": ["php"],
             \}
     endif
@@ -475,7 +475,8 @@ function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEn
                 \ exists("g:liteRunner_ConqueTerm_contents_passing_mode") ?
                 \ g:liteRunner_ConqueTerm_contents_passing_mode : 1
     let text_or_lines = s:GetPassingTextOrLines(a:lrange, pass_mode)
-    let lbufspec = s:PrepareInteractiveBuffer(a:cmd)
+    let cmd=s:PreprocessCommandLine(a:cmd)
+    let lbufspec = s:PrepareInteractiveBuffer(cmd)
     if !empty(lbufspec)
         " jump to the interactive buffer
         let winnr = bufwinnr(lbufspec[0])
@@ -637,17 +638,7 @@ function! s:RunScriptFile(cmd, fpath, buftitle, lsargs)
         execute 'setlocal errorformat='.join(lsefm, ',')
     endif
 
-
-    if has("win32")
-        "TODO executable() check needed
-        " in Windows cannot work /usr/bin/env
-        let lcmd=split(cmd, ' ')
-        if !executable(lcmd[0])
-            if fnamemodify(lcmd[0], ':t') == 'env'
-                let cmd=join(lcmd[1:], ' ') 
-            endif
-        endif
-    endif
+    let cmd=s:PreprocessCommandLine(cmd)
 
     " expand (%) symbols
     let excmd=s:ExpandWithSpecifiedPath(cmd, a:fpath)
@@ -712,6 +703,21 @@ function! LiteRunner#JumpToOwnerBuffer()
     if !empty(ownerno) && bufexists(ownerno)
         execute bufwinnr(ownerno) . 'wincmd w'
     endif
+endfunction
+
+"make preprocess to cmdline before executing
+function! s:PreprocessCommandLine(cmd)
+    if has("win32")
+        "TODO executable() check needed
+        " in Windows cannot work /usr/bin/env
+        let lcmd=split(a:cmd, ' ')
+        if !executable(lcmd[0])
+            if fnamemodify(lcmd[0], ':t') == 'env'
+                return join(lcmd[1:], ' ') 
+            endif
+        endif
+    endif
+    return a:cmd
 endfunction
 
 "vim:ts=8:sts=4:sw=4:et
