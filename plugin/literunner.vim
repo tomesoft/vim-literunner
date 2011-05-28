@@ -1,5 +1,5 @@
 "
-" liteRunner plugin v0.1 (tome@tomesoft.net)
+" liteRunner plugin v0.2 (tome@tomesoft.net)
 "
 " Supports edit-run-edit cycle of your scripting
 "
