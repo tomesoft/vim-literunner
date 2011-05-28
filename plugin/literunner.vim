@@ -83,12 +83,19 @@ if !exists("g:liteRunner_windowheight_max")
 endif
 
 " ConqueTerm Command
-if !exists("g:liteRunner_ConqueTerm_command") && exists(":ConqueTerm")
-    let g:liteRunner_ConqueTerm_command='ConqueTermSplit'
+"if !exists("g:liteRunner_ConqueTerm_command") && exists(":ConqueTerm")
+    "let g:liteRunner_ConqueTerm_command='ConqueTermSplit'
+"endif
+
+" flag reexec ConqueTerm always or not
+if !exists("g:liteRunner_ConqueTerm_reexec_always")
+    let g:liteRunner_ConqueTerm_reexec_always=0
 endif
 
-let g:liteRunner_ConqueTerm_reexec_always=1
-let g:liteRunner_ConqueTerm_contents_passing_mode=0
+" 0=never passing, 1=selection only, 2=entire of content
+if !exists("g:liteRunner_ConqueTerm_contents_passing_mode")
+    let g:liteRunner_ConqueTerm_contents_passing_mode=1
+endif
 
 "
 " dictionary of filetypes and commands
@@ -208,6 +215,12 @@ if !hasmapto('LRRunScriptInteractively')
     endif
 endif
 
+if !hasmapto('LRRunScriptInteractivelyWithEntireOfContent')
+    if mapcheck('<Leader>I') == ''
+        :noremap <Leader>I :LRRunScriptInteractivelyWithEntireOfContent<CR>
+    endif
+endif
+
 if !hasmapto('LRRunScriptWithHeldArguments')
     if mapcheck('<Leader>g') == ''
         :noremap <Leader>g :LRRunScriptWithHeldArguments<CR>
@@ -224,10 +237,11 @@ endif
 "
 " commands
 "
-command! -nargs=* LRRunScript :call s:RunScript(<q-args>)
-command! -nargs=0 LRRunScriptWithHeldArguments :call s:RunScriptWithHeldArguments()
+command! -nargs=* -range=% LRRunScript :call s:RunScript(<line1>, <line2>, <q-args>)
+command! -nargs=0 -range=% LRRunScriptWithHeldArguments :call s:RunScriptWithHeldArguments(<line1>, <line2>)
 command! -nargs=0 LREditHeldArguments :call s:EditHeldArgumentsInCmdline()
-command! -nargs=0 LRRunScriptInteractively :call s:RunScriptInteractively()
+command! -nargs=0 -range=% LRRunScriptInteractively :call s:RunScriptInteractively(<line1>, <line2>)
+command! -nargs=0 -range=% LRRunScriptInteractivelyWithEntireOfContent :call s:RunScriptInteractivelyWithEntireOfContent()
 
 
 "
@@ -241,7 +255,7 @@ function! LiteRunner#ExpandHeldScriptArguments()
     if exists("b:liteRunner_held_script_arguments")
         return join(b:liteRunner_held_script_arguments, ' ')
     else
-        return ""
+        return ''
     endif
 endfunction
 
@@ -255,30 +269,38 @@ function! s:EditHeldArgumentsInCmdline()
 endfunction
 
 " RunScript function called via Command
-function! s:RunScript(...)
+function! s:RunScript(rstart, rend, ...)
     " save arguments to use later in RunScriptWithHeldArguments()
     let b:liteRunner_held_script_arguments=a:000
-    call s:RunScriptImpl(b:liteRunner_held_script_arguments, 0)
+    call s:RunScriptImpl(b:liteRunner_held_script_arguments, [a:rstart, a:rend],
+                \ {})
 endfunction
 
 " RunScriptWithHeldArguments function called via Command
-function! s:RunScriptWithHeldArguments()
+function! s:RunScriptWithHeldArguments(rstart, rend)
+    let arg=[]
     if exists("b:liteRunner_held_script_arguments")
         let arg=b:liteRunner_held_script_arguments
-        if type(arg) == type([])
-            call s:RunScriptImpl(arg, 0)
-        else
-            call s:RunScriptImpl([ arg ], 0) "(list arg) ->[arg]
-        endif
-    else
-        call s:RunScriptImpl([], 0)
+        let arg= type(arg) == type([]) ? arg : [arg]
     endif
+    call s:RunScriptImpl(arg, [a:rstart, a:rend],
+                \ {})
 endfunction
 
 " RunScriptInteractively function calld via Command
-function! s:RunScriptInteractively()
-    call s:RunScriptImpl([], 1)
+function! s:RunScriptInteractively(rstart, rend)
+    "echohl WarningMsg | echo 'rstart='.a:rstart.' rend='.a:rend | echohl None
+    call s:RunScriptImpl([], [a:rstart, a:rend],
+                \ {'interactively':1})
 endfunction
+"
+" RunScriptInteractivelyWithEntireOfContent function calld via Command
+function! s:RunScriptInteractivelyWithEntireOfContent()
+
+    call s:RunScriptImpl([], [],
+                \{'interactively':1, 'withEntireContent':1})
+endfunction
+
 
 " analyze the shebang line and returns their command line string
 function! s:GetShebangCommand()
@@ -300,30 +322,32 @@ function! s:GetCommandListFromFtypsCmdsDict()
 endfunction
 
 "
-function! s:RunScriptImpl(lsargs, interactively)
+function! s:RunScriptImpl(lsargs, lrange, options)
     let cmd = ''
+    let interactively = get(a:options, 'interactively', 0)
+    let forcibly_with_entire_content = get(a:options, 'withEntireContent', 0)
     if g:liteRunner_tries_to_use_shebang
         "try to find shebang #! of current buffer
         let cmd = s:GetShebangCommand()
     endif
 
     "shebang not found or not tried
-    if cmd == ''
+    if empty(cmd)
         let lstcmd=s:GetCommandListFromFtypsCmdsDict()
         if empty(lstcmd)
             echohl WarningMsg | echo "cannot run the typeof " . (&filetype ? &filetype : '*None*') | echohl None
         else
-            let cmd = get(lstcmd, (a:interactively? 1 : 0), lstcmd[0] 
+            let cmd = get(lstcmd, (interactively? 1 : 0), lstcmd[0] 
         endif
     endif
 
-    if cmd != ''
+    if !empty(cmd)
         let bufhdr = s:GetProgname(cmd)
-        if a:interactively
-            "TODO: implement here
-            call s:RunCurrentBufferInteractively(cmd, bufhdr, a:lsargs)
+        if interactively
+            call s:RunCurrentBufferInteractively(cmd, bufhdr, a:lsargs, a:lrange,
+                        \ forcibly_with_entire_content)
         else
-            call s:RunCurrentBufferAsScript(cmd, bufhdr, a:lsargs)
+            call s:RunCurrentBufferAsScript(cmd, bufhdr, a:lsargs, a:lrange)
         endif
         let consumed =1
     endif
@@ -333,11 +357,11 @@ endfunction
 "
 " run current buffer as a script file 
 "
-function! s:RunCurrentBufferAsScript(cmd, bufheader, lsargs)
+function! s:RunCurrentBufferAsScript(cmd, bufheader, lsargs, lrange)
     let buftitle=a:bufheader . " output"
     let fpath=expand("%")
     let fname=expand("%:t")
-    if fname == ""
+    if empty(fname)
         echohl WarningMsg | echo "save at first!!" | echohl None
     else
         let buftitle = "[" . buftitle . "][" . fname . "]"
@@ -357,8 +381,9 @@ function! s:GetAliveInteraciveBufferNumber()
     return 0
 endfunction
 
+" returns list [bufnr, conque_term_idx]
 function! s:PrepareInteractiveBuffer(cmd)
-    let cbufno = bufnr("%")
+    let cbufno = bufnr('%')
     let ibufno = s:GetAliveInteraciveBufferNumber()
     if ibufno
         let idx=getbufvar(cbufno, "liteRunner_conque_term_index")
@@ -380,13 +405,22 @@ function! s:PrepareInteractiveBuffer(cmd)
     if !ibufno
         if exists("g:liteRunner_ConqueTerm_command")
             execute g:liteRunner_ConqueTerm_command . ' ' . a:cmd
+        else
+            call conque_term#open(a:cmd, ['below split', 'resize '.
+                        \ g:liteRunner_windowheight_max])
         endif
         " if buffer moved, that is succeeded to execute the program (maybe)
-        if cbufno != bufnr("%")
-            let ibufno = bufnr("%")
+        if cbufno != bufnr('%')
+            let ibufno = bufnr('%')
             call setbufvar(cbufno, "liteRunner_interactive_bufnr", ibufno)
             let idx = get(conque_term#get_instance(), 'idx', 0)
             call setbufvar(cbufno, "liteRunner_conque_term_index", idx)
+            call s:SetOwnerBuffer(ibufno, cbufno)
+            if has('localmap')
+                " buffer local map <CR> jump back to previous window
+                "nnoremap <silent> <buffer> <CR> :wincmd p<CR>
+                nnoremap <silent> <buffer> <CR> :call LiteRunner#JumpToOwnerBuffer()<CR>
+            endif
             return [ibufno, idx]
         endif
     endif
@@ -394,21 +428,87 @@ function! s:PrepareInteractiveBuffer(cmd)
     return []
 endfunction
 
+" returns string or list of lines
+function! s:GetPassingTextOrLines(lrange, mode)
+    let pass_mode = a:mode
+    if pass_mode == 0 | return '' | endif
+
+    if pass_mode <= 2
+        "TODO: need to respond the select mode
+        let lastVisualMode = visualmode(" ") "get and clear visualmode
+        if empty(lastVisualMode) && (a:lrange[0] != 1 || a:lrange[1] != line('$'))
+            "given the specific range e.g. /^#/,5
+            return getline(a:lrange[0], a:lrange[1])
+        endif
+
+        "echohl WarningMsg | echo 'lastVisualMode = '.lastVisualMode | echohl None
+        if !empty(lastVisualMode)
+            "if lastVisualMode == 'v' or <C-V> blockmode
+            let svreg = @@
+            " redo the visual selection and yank it
+            silent execute 'normal! gvy'
+            let lresult = split(@@, '[\r\n]')
+            let @@ = svreg
+            call visualmode(' ') "clear last visualmode
+            return lresult
+        endif
+    endif
+
+    if pass_mode >= 2
+        "pass entire contents (exclude shebang line)
+        return getline(s:GetShebangCommand() != '' ? 2 : 1, '$')
+    endif
+
+    return ''
+endfunction
+
 "
 " run contents of current buffer interactively
 "
-function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs)
-    "TODO: responding to visual mode
-    let lslines = getline(s:GetShebangCommand() != '' ? 2 : 1, '$')
-    "check the interactive buffer alive
+function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEntireContent)
+    if !exists(':ConqueTerm')
+        echohl WarningMsg | echo 'ConqueTerm plugin required!' | echohl None
+        return
+    endif
+
+    let pass_mode = a:withEntireContent ? 3 :
+                \ exists("g:liteRunner_ConqueTerm_contents_passing_mode") ?
+                \ g:liteRunner_ConqueTerm_contents_passing_mode : 1
+    let text_or_lines = s:GetPassingTextOrLines(a:lrange, pass_mode)
     let lbufspec = s:PrepareInteractiveBuffer(a:cmd)
     if !empty(lbufspec)
+        " jump to the interactive buffer
+        let winnr = bufwinnr(lbufspec[0])
+        if winnr != bufwinnr(bufnr('%'))
+            execute winnr . 'wincmd w'
+        endif
+
+        "let svmode = mode()
+        "change to normal mode before write something
+        stopinsert
+        "if svmode == 'i'
+            "stopinsert
+        "endif
+        
         " do input
         let conq = conque_term#get_instance(lbufspec[1])
-        if !empty(conq)
+        if !empty(conq) && !empty(text_or_lines)
             call conq.read(100)
-            for ln in lslines | call conq.writeln(ln) | call conq.read(1) | endfor
+            if type(text_or_lines) == type('')
+                call conq.write(text_or_lines)
+            elseif type(text_or_lines) == type([])
+                "for ln in text_or_lines | call conq.writeln(ln) | endfor
+                " to solve a deadlock problem, insert conq.read(1)
+                for ln in text_or_lines | call conq.writeln(ln) | call conq.read(1) | endfor
+            endif
+            call conq.read(100)
         endif
+
+        " restore insert mode
+        "if svmode == 'i'
+            "startinsert!
+        "endif
+        startinsert!
     endif
 endfunction
 
@@ -427,7 +527,7 @@ endfunction
 " if (%) in src, it replaces into path
 function! s:ExpandWithSpecifiedPath(str, path)
     let lst=matchlist(a:str, '\([^(]*\)\((%[^)]*)\)\(.*\)')
-    if len(lst) == 0
+    if empty(lst)
         return a:str
     endif
     return lst[1] . fnamemodify(a:path, lst[2][2:-2]) . s:ExpandWithSpecifiedPath(lst[3], a:path)
@@ -486,6 +586,27 @@ function! s:ContainsValidEntryInQuickfix()
     return 0
 endfunction
 
+" set up an output buffer
+function! s:PrepareOutputBuffer(buftitle)
+    let ownerbufno = bufnr('%')
+    execute '5new ' . a:buftitle
+    execute 'resize '. g:liteRunner_windowheight_default
+    set number
+    setlocal bufhidden=delete "delete this buffer when hide
+    setlocal noswapfile
+    "change buftype to nofile to make no effect on chdir
+    set buftype=nofile
+    let bufno = bufnr('%')
+    " set relationship to owner
+    call s:SetOwnerBuffer(bufno, ownerbufno)
+    if has('localmap')
+        " buffer local map <CR> jump back to previous window
+        "nnoremap <silent> <buffer> <CR> :wincmd p<CR>
+        nnoremap <silent> <buffer> <CR> :call LiteRunner#JumpToOwnerBuffer()<CR>
+    endif
+    return bufno
+endfunction
+
 "
 " run script file and the result shown in another window
 "
@@ -506,13 +627,9 @@ function! s:RunScriptFile(cmd, fpath, buftitle, lsargs)
     "save splitbelow option to use below
     let save_sb=&splitbelow
     setlocal splitbelow
-    "execute "5new " . buftitle0
-    execute "" . g:liteRunner_windowheight_default . "new " . buftitle0
-    set number
-    setlocal bufhidden=delete "delete this buffer when hide
-    setlocal noswapfile
-    "change buftype to nofile to make no effect on chdir
-    set buftype=nofile
+
+    "prepare output buffer
+    call s:PrepareOutputBuffer(buftitle0)
 
     " try to get a custom errorformat
     let lsefm = s:GetCustomErrorFormatByProgname(s:GetProgname(cmd))
@@ -537,20 +654,15 @@ function! s:RunScriptFile(cmd, fpath, buftitle, lsargs)
 
     if cmd != excmd
         echo ":r!" . excmd . arg
-        execute "r!" . excmd . arg
+        silent execute "r!" . excmd . arg
     else
         echo ":r!" . cmd . ' ' . a:fpath . arg
-        execute "r!" . cmd . ' ' . a:fpath . arg
+        silent execute "r!" . cmd . ' ' . a:fpath . arg
     endif
 
     "remove first empty line
     execute ':0d'
     setlocal nomod
-    if has('localmap')
-        " buffer local map <CR> jump back to previous window
-        "noremap <buffer> <CR> :call MyJumpToPreviousWindow()<CR>
-        noremap <buffer> <CR> :wincmd p<CR>
-    endif
     
     let l:errors_in_quickfix=0
     "quickfix
@@ -571,7 +683,7 @@ function! s:RunScriptFile(cmd, fpath, buftitle, lsargs)
     "restore splitbelow option
     let &splitbelow=save_sb
     if l:errors_in_quickfix
-        wincmd p
+        execute 'wincmd p'
         if g:liteRunner_shows_quickfix_on_error
             execute ':copen'
         endif
@@ -582,8 +694,24 @@ function! s:RunScriptFile(cmd, fpath, buftitle, lsargs)
             "stay in window
         else
             "back to previous window
-            wincmd p
+            execute 'wincmd p'
         endif
     endif
 endfunction
+
+" make relationship between buffers
+function! s:SetOwnerBuffer(childno, ownerno)
+    if bufexists(a:childno) && bufexists(a:ownerno)
+        call setbufvar(a:childno, "liteRunner_owner_bufnr", a:ownerno)
+    endif
+endfunction
+
+" jump to the owner buffer
+function! LiteRunner#JumpToOwnerBuffer()
+    let ownerno = getbufvar('%', "liteRunner_owner_bufnr")
+    if !empty(ownerno) && bufexists(ownerno)
+        execute bufwinnr(ownerno) . 'wincmd w'
+    endif
+endfunction
+
 "vim:ts=8:sts=4:sw=4:et
