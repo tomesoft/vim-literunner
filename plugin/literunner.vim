@@ -129,18 +129,10 @@ if !exists("g:liteRunner_ftyps_cmds_dict")
     endif
     " appendix : experimental
     if has('mac')
-        let g:liteRunner_ftyps_cmds_dict["html"] = ["open", "open by os"]
+        let g:liteRunner_ftyps_cmds_dict["html"] = ["open"]
     endif
+    "let g:liteRunner_ftyps_cmds_dict["scheme"] = ["mit-scheme --load (%)"]
 endif
-
-" update or add entry of the ftyps_cmds_dict
-" value type is expected list or string
-function! LiteRunner#UpdateFtypsCmdsEntry(key, value)
-    let g:liteRunner_prognames_efms_dict[key] = 
-                \ type(value) == type([]) ? value :
-                \ type(value) == type('') ? [value] :
-                \ []
-endfunction
 
 "
 " dictionary of custom errorformat by progname
@@ -196,15 +188,6 @@ if !exists("g:liteRunner_prognames_efms_dict")
                 \}
 endif
 
-" update or add entry of the prognames_efms_dict
-" value type is expected list or string
-function! LiteRunner#UpdateFtypsEfmsEntry(key, value)
-    let g:liteRunner_ftyps_cmds_dict[key] = 
-                \ type(value) == type([]) ? value :
-                \ type(value) == type('') ? [value] :
-                \ []
-endfunction
-
 
 "
 " mappings
@@ -247,6 +230,25 @@ command! -nargs=0 -range=% LRRunScriptInteractivelyWithEntireOfContent :call s:R
 "
 " functions
 "
+
+" update or add entry of the ftyps_cmds_dict
+" value type is expected list or string
+function! LiteRunner#UpdateFtypsCmdsEntry(key, value)
+    let g:liteRunner_ftyps_cmds_dict[a:key] = 
+                \ type(a:value) == type([]) ? a:value :
+                \ type(a:value) == type('') ? [a:value] :
+                \ []
+endfunction
+
+" update or add entry of the prognames_efms_dict
+" value type is expected list or string
+function! LiteRunner#UpdateFtypsEfmsEntry(key, value)
+    let g:liteRunner_ftyps_cmds_dict[a:key] = 
+                \ type(a:value) == type([]) ? a:value :
+                \ type(a:value) == type('') ? [a:value] :
+                \ []
+endfunction
+
 "holds script arguments that ran lastly
 let b:liteRunner_held_script_arguments=[]
 
@@ -289,7 +291,6 @@ endfunction
 
 " RunScriptInteractively function calld via Command
 function! s:RunScriptInteractively(rstart, rend)
-    "echohl WarningMsg | echo 'rstart='.a:rstart.' rend='.a:rend | echohl None
     call s:RunScriptImpl([], [a:rstart, a:rend],
                 \ {'interactively':1})
 endfunction
@@ -335,9 +336,9 @@ function! s:RunScriptImpl(lsargs, lrange, options)
     if empty(cmd)
         let lstcmd=s:GetCommandListFromFtypsCmdsDict()
         if empty(lstcmd)
-            echohl WarningMsg | echo "cannot run the typeof " . (&filetype ? &filetype : '*None*') | echohl None
+            call s:echo_warn("cannot run the typeof " . (&filetype ? &filetype : '*None*'))
         else
-            let cmd = get(lstcmd, (interactively? 1 : 0), lstcmd[0] 
+            let cmd = get(lstcmd, (interactively? 1 : 0), lstcmd[0])
         endif
     endif
 
@@ -362,7 +363,7 @@ function! s:RunCurrentBufferAsScript(cmd, bufheader, lsargs, lrange)
     let fpath=expand("%")
     let fname=expand("%:t")
     if empty(fname)
-        echohl WarningMsg | echo "save at first!!" | echohl None
+        call s:echo_warn("save at first!!")
     else
         let buftitle = "[" . buftitle . "][" . fname . "]"
         w%
@@ -381,8 +382,68 @@ function! s:GetAliveInteraciveBufferNumber()
     return 0
 endfunction
 
+let s:liteRunner_conque_term_registered = 0
+function! s:RegisterCallbacks()
+    if !s:liteRunner_conque_term_registered
+        call conque_term#register_function('after_startup', 'LiteRunner#AfterStartupConqueTerm')
+        let s:liteRunner_conque_term_registered = 1
+    endif
+endfunction
+
+
+function! LiteRunner#AfterStartupConqueTerm(conqterm)
+    let conq = a:conqterm
+    call s:echo_warn('after startup idx='. conq['idx'])
+    if exists('b:liteRunner_input_queue') && !empty(b:liteRunner_input_queue)
+        lockvar b:liteRunner_input_queue 1
+        for ent in b:liteRunner_input_queue
+            call conq.writeln(ent)
+        endfor
+        let b:liteRunner_input_queue = []
+        unlockvar b:liteRunner_input_queue
+    endif
+    let b:liteRunner_conque_term_loaded = 1
+endfunction
+
+function! s:echo_warn(msg)
+    echohl WarningMsg | echo a:msg | echohl None
+endfunction
+
+function! s:EnqueInputOfConqueTerm(conqterm, text_or_lines)
+    call s:echo_warn('Enqueued.')
+    if !exists('b:liteRunner_input_queue')
+        let b:liteRunner_input_queue = []
+    endif
+    lockvar b:liteRunner_input_queue 1
+    let b:liteRunner_input_queue += text_or_lines
+    unlockvar b:liteRunner_input_queue
+endfunction
+
+function! s:InputToConqueTerm(conqterm, text_or_lines)
+    let conq = a:conqterm
+    let text_or_lines = a:text_or_lines
+
+    if !exists("b:liteRunner_conque_term_loaded")
+        call EnqueInputOfConqueTerm(conq, text_or_lines)
+        return
+    endif
+
+    if !empty(conq) && !empty(text_or_lines)
+        call conq.read(100)
+        if type(text_or_lines) == type('')
+            call conq.write(text_or_lines)
+        elseif type(text_or_lines) == type([])
+            "for ln in text_or_lines | call conq.writeln(ln) | endfor
+            " to solve a deadlock problem, insert conq.read(1)
+            for ln in text_or_lines | call conq.writeln(ln) | call conq.read(1) | endfor
+        endif
+        call conq.read(100)
+    endif
+endfunction
+
 " returns list [bufnr, conque_term_idx]
 function! s:PrepareInteractiveBuffer(cmd)
+    call s:RegisterCallbacks()
     let cbufno = bufnr('%')
     let ibufno = s:GetAliveInteraciveBufferNumber()
     if ibufno
@@ -441,7 +502,6 @@ function! s:GetPassingTextOrLines(lrange, mode)
             return getline(a:lrange[0], a:lrange[1])
         endif
 
-        "echohl WarningMsg | echo 'lastVisualMode = '.lastVisualMode | echohl None
         if !empty(lastVisualMode)
             "if lastVisualMode == 'v' or <C-V> blockmode
             let svreg = @@
@@ -467,7 +527,7 @@ endfunction
 "
 function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEntireContent)
     if !exists(':ConqueTerm')
-        echohl WarningMsg | echo 'ConqueTerm plugin required!' | echohl None
+        call s:echo_warn('ConqueTerm plugin required!')
         return
     endif
 
@@ -476,6 +536,9 @@ function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEn
                 \ g:liteRunner_ConqueTerm_contents_passing_mode : 1
     let text_or_lines = s:GetPassingTextOrLines(a:lrange, pass_mode)
     let cmd=s:PreprocessCommandLine(a:cmd)
+    " expands (%) in cmd
+    let cmd=s:ExpandWithSpecifiedPath(cmd, expand('%:t'))
+
     let lbufspec = s:PrepareInteractiveBuffer(cmd)
     if !empty(lbufspec)
         " jump to the interactive buffer
@@ -494,15 +557,7 @@ function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEn
         " do input
         let conq = conque_term#get_instance(lbufspec[1])
         if !empty(conq) && !empty(text_or_lines)
-            call conq.read(100)
-            if type(text_or_lines) == type('')
-                call conq.write(text_or_lines)
-            elseif type(text_or_lines) == type([])
-                "for ln in text_or_lines | call conq.writeln(ln) | endfor
-                " to solve a deadlock problem, insert conq.read(1)
-                for ln in text_or_lines | call conq.writeln(ln) | call conq.read(1) | endfor
-            endif
-            call conq.read(100)
+            call s:InputToConqueTerm(conq, text_or_lines)
         endif
 
         " restore insert mode
