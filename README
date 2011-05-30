@@ -53,3 +53,7 @@ ChangeLog:
     * NEW newly created and versioned v0.1
       tested on MacOSX Vim7.3
 
+Files:
+./autoload/literunner.vim
+./plugin/literunner.vim
+./etc/mk_vimball.txt
