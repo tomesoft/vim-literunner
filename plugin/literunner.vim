@@ -393,7 +393,7 @@ endfunction
 
 function! LiteRunner#AfterStartupConqueTerm(conqterm)
     let conq = a:conqterm
-    call s:echo_warn('after startup idx='. conq['idx'])
+    "call s:echo_warn('after startup idx='. conq['idx'])
     if exists('b:liteRunner_input_queue') && !empty(b:liteRunner_input_queue)
         lockvar b:liteRunner_input_queue 1
         for ent in b:liteRunner_input_queue
@@ -419,6 +419,23 @@ function! s:EnqueInputOfConqueTerm(conqterm, text_or_lines)
     unlockvar b:liteRunner_input_queue
 endfunction
 
+
+" wait to stable input
+function! s:WaitUntilCannotRead(conqterm, timeout, step)
+    let conq = a:conqterm
+    let elaps = 0
+    while a:timeout > elaps
+        let tick = getbufvar('%', 'changedtick')
+        call conq.read(a:step)
+        if tick != getbufvar('%', 'changedtick')
+            call s:echo_warn('reset **')
+            let elaps=0
+        endif
+        let elaps += a:step
+    endwhile
+endfunction
+
+" input to conque_term
 function! s:InputToConqueTerm(conqterm, text_or_lines)
     let conq = a:conqterm
     let text_or_lines = a:text_or_lines
@@ -429,7 +446,8 @@ function! s:InputToConqueTerm(conqterm, text_or_lines)
     endif
 
     if !empty(conq) && !empty(text_or_lines)
-        call conq.read(100)
+        "call s:WaitUntilCannotRead(conq, 3000, 1)
+        "call conq.read(5000)
         if type(text_or_lines) == type('')
             call conq.write(text_or_lines)
         elseif type(text_or_lines) == type([])
@@ -438,6 +456,7 @@ function! s:InputToConqueTerm(conqterm, text_or_lines)
             for ln in text_or_lines | call conq.writeln(ln) | call conq.read(1) | endfor
         endif
         call conq.read(100)
+        "call s:WaitUntilCannotRead(conq, 500, 1)
     endif
 endfunction
 
@@ -474,7 +493,8 @@ function! s:PrepareInteractiveBuffer(cmd)
         if cbufno != bufnr('%')
             let ibufno = bufnr('%')
             call setbufvar(cbufno, "liteRunner_interactive_bufnr", ibufno)
-            let idx = get(conque_term#get_instance(), 'idx', 0)
+            let conq = conque_term#get_instance()
+            let idx = get(conq, 'idx', 0)
             call setbufvar(cbufno, "liteRunner_conque_term_index", idx)
             call s:SetOwnerBuffer(ibufno, cbufno)
             if has('localmap')
@@ -482,6 +502,8 @@ function! s:PrepareInteractiveBuffer(cmd)
                 "nnoremap <silent> <buffer> <CR> :wincmd p<CR>
                 nnoremap <silent> <buffer> <CR> :call LiteRunner#JumpToOwnerBuffer()<CR>
             endif
+            "TODO: To solve a problem that is lacked the first input line, in gvim on Windows
+            call s:WaitUntilCannotRead(conq, 2000, 1)
             return [ibufno, idx]
         endif
     endif
@@ -556,6 +578,8 @@ function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEn
         
         " do input
         let conq = conque_term#get_instance(lbufspec[1])
+        "call s:echo_warn(conq)
+        "call s:echo_warn('liteRunner_conque_term_loaded='. getbufvar('%', 'liteRunner_conque_term_loaded'))
         if !empty(conq) && !empty(text_or_lines)
             call s:InputToConqueTerm(conq, text_or_lines)
         endif
