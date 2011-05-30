@@ -1,4 +1,4 @@
-vim-liteRunner plugin v0.1 
+vim-liteRunner plugin v0.2 
 
 Creator: Junichi OKADOME  <tome@tomesoft.net>
 
@@ -54,6 +54,5 @@ ChangeLog:
       tested on MacOSX Vim7.3
 
 Files:
-./autoload/literunner.vim
-./plugin/literunner.vim
-./etc/mk_vimball.txt
+autoload/literunner.vim
+plugin/literunner.vim
