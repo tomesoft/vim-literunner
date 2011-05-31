@@ -1,50 +1,9 @@
-" File: plugin/literunner.vim
-" Version: 0.2
+" File: plugin/liteRunner.vim
+" Version: 0.3
 "
 " liteRunner plugin
 "
-" Supports edit-run-edit cycle of your scripting
-"
-" In default, shebang (#!...) line in your editing file is used to run it, if exists.
-"
-" Usage:
-" 1. You can put this file into ~/.vim/plugin/.
-" 2. Add line to be loaded to your .vimrc
-"    :runtime plugin/literunner.vim
-" 3. In editing your script, key-in <Leader>g (in default, <Leader> mapped
-"    to backslash '\') runs your script and the result is shown in output window.
-" 4. If you need to pass some command line arguments when run it, key-in
-"    <Leader>G, cusor then cusor jumps into command line
-"     :LRRunscript 
-"    input arguments (e.g. --help) and key-in return to run with the
-"    arguments.
-"     :LRRunscript --help
-"    (is evaluated like as /usr/bin/env python myscript.py --help)
-" 5. The specified arguments (in Step4) are held (buffer locally), and that
-"    will be re-used on next run with <Leader>g until change them (using
-"    <Leader>G) or finish editing.
-" 
-" Customize:
-" 1.Mapping
-" :noremap <Leader>g :LRRunScriptWithHeldArguments<CR>
-" :noremap <Leader>G :<C-\>e("LRRunScript " . LiteRunner#ExpandHeldScriptArguments())<CR>
-"   
-" 2.Some variables are for customization, their prefix is g:liteRunner_XXX.
-" TODO: explains each items
-" g:liteRunner_tries_to_use_shebang=0 (bool=0,1)
-" g:liteRunner_uses_quickfix_on_error=1 (bool=0,1)
-" g:liteRunner_shows_quickfix_on_error=1 (bool=0,1)
-" g:liteRunner_checks_errors_always=0 (bool=0,1)
-" g:liteRunner_windowheight_default=5 (num)
-" g:liteRunner_windowheight_max=10 (num)
-" g:liteRunner_ftyps_cmds_dict={dict of defaults} (dict)
-" g:liteRunner_prognames_efms_dict={dictjmap of defaults}
-"
-" 3.Some functions are for customization, their prefix is LiteRunner#XXX
-" TODO: explains each item
-" LiteRunner#UpdateFtypsCmdsEntry(key, value)
-" LiteRunner#UpdateFtypsEfmsEntry(key, value)
-" LiteRunner#ExpandHeldScriptArguments()
+" Supports Edit,Run,Edit cycle of your scripting
 "
 if exists("g:loaded_literunner")
     finish
@@ -89,14 +48,14 @@ endif
     "let g:liteRunner_ConqueTerm_command='ConqueTermSplit'
 "endif
 
-" flag reexec ConqueTerm always or not
-if !exists("g:liteRunner_ConqueTerm_reexec_always")
-    let g:liteRunner_ConqueTerm_reexec_always=0
+" flag renew ConqueTerm everytime or not
+if !exists("g:liteRunner_ConqueTerm_renew_everytime")
+    let g:liteRunner_ConqueTerm_renew_everytime=0
 endif
 
 " 0=never passing, 1=selection only, 2=entire of content
-if !exists("g:liteRunner_ConqueTerm_contents_passing_mode")
-    let g:liteRunner_ConqueTerm_contents_passing_mode=1
+if !exists("g:liteRunner_ConqueTerm_content_pass_mode")
+    let g:liteRunner_ConqueTerm_content_pass_mode=1
 endif
 
 "
@@ -106,34 +65,39 @@ endif
 " if (%) in command string, it replaced with editing file path.
 " e.g. script -i=(%) --dir=(%:h)
 if !exists("g:liteRunner_ftyps_cmds_dict")
+    let ENVPROG='/usr/bin/env'
+    if !executable(ENVPROG)
+        " search env in path
+        let ENVPROG = glob('`which env`')
+    endif
+    let ENV=''
+    if !empty(ENVPROG)
+        let ENV = ENVPROG.' '
+    endif
+    "TODO: maintain list
     let g:liteRunner_ftyps_cmds_dict={
-        \"scheme": ["/usr/bin/env gosh", "/usr/bin/env gosh -i"],
-        \"perl": ["/usr/bin/env perl"],
-        \"python": ["/usr/bin/env python"],
-        \"ruby": ["/usr/bin/env ruby", "/usr/bin/env irb"],
-        \"lua": ["/usr/bin/env lua"],
-        \"php": ["/usr/bin/env php"],
-        \"sh": ["/usr/bin/env sh"],
-        \"csh": ["/usr/bin/env csh"],
+        \'awk'      : [ENV.'awk -f'],
+        \'lua'      : [ENV.'lua'],
+        \'perl'     : [ENV.'perl'],
+        \'php'      : [ENV.'php'],
+        \'python'   : [ENV.'python'],
+        \'ruby'     : [ENV.'ruby', ENV.'irb'],
+        \'scheme'   : [ENV.'gosh', ENV.'gosh -i'],
+        \'sed'      : [ENV.'sed -f'],
+        \'sh'       : [ENV.'sh'],
+        \'csh'      : [ENV.'csh'],
+        \'tcsh'     : [ENV.'tcsh'],
+        \'zsh'      : [ENV.'zsh'],
         \}
 
     if has('unix')
     elseif has('win32')
-        " TODO: for win32 settings here
-        let g:liteRunner_ftyps_cmds_dict={
-            \"scheme": ["gosh", "gosh -i"],
-            \"perl": ["perl"],
-            \"python": ["python"],
-            \"ruby": ["ruby", "irb"],
-            \"lua": ["lua"],
-            \"php": ["php"],
-            \}
     endif
     " appendix : experimental
     if has('mac')
-        let g:liteRunner_ftyps_cmds_dict["html"] = ["open"]
+        let g:liteRunner_ftyps_cmds_dict['html'] = ['open']
     endif
-    "let g:liteRunner_ftyps_cmds_dict["scheme"] = ["mit-scheme --load (%)"]
+    "let g:liteRunner_ftyps_cmds_dict['scheme'] = ['mit-scheme --load (%)']
 endif
 
 "
@@ -182,6 +146,8 @@ if !exists("g:liteRunner_prognames_efms_dict")
     let s:lua_efms=[
                 \ 'lua:\ %f:%l:\ %m'
                 \]
+
+    "TODO: maintain the list
     let g:liteRunner_prognames_efms_dict = {
                 \ 'python' : s:python_efms,
                 \ 'gosh'   : s:gosh_efms,

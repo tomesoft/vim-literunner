@@ -1,13 +1,11 @@
-" File: autoload/literunner.vim
-" Version: 0.2
+" File: autoload/liteRunner.vim
+" Version: 0.3
 "
 " liteRunner plugin 
 "
-" Supports edit-run-edit cycle of your scripting
+" Supports Edit,Run,Edit cycle of your scripting
 "
-" In default, shebang (#!...) line in your editing file is used to run it, if exists.
-"
-"
+
 "
 " functions
 "
@@ -23,8 +21,8 @@ endfunction
 
 " update or add entry of the prognames_efms_dict
 " value type is expected list or string
-function! liteRunner#UpdateFtypsEfmsEntry(key, value)
-    let g:liteRunner_ftyps_cmds_dict[a:key] = 
+function! liteRunner#UpdatePrognamesEfmsEntry(key, value)
+    let g:liteRunner_prognames_efms_dict[a:key] = 
                 \ type(a:value) == type([]) ? a:value :
                 \ type(a:value) == type('') ? [a:value] :
                 \ []
@@ -116,7 +114,7 @@ function! s:RunScriptImpl(lsargs, lrange, options)
     if empty(cmd)
         let lstcmd=s:GetCommandListFromFtypsCmdsDict()
         if empty(lstcmd)
-            call s:echo_warn("cannot run the typeof " . (&filetype ? &filetype : '*None*'))
+            call s:echo_warn("cannot run the typeof " . (!empty(&filetype) ? &filetype : '*None*'))
         else
             let cmd = get(lstcmd, (interactively? 1 : 0), lstcmd[0])
         endif
@@ -208,7 +206,7 @@ function! s:WaitUntilCannotRead(conqterm, timeout, step)
         let tick = getbufvar('%', 'changedtick')
         call conq.read(a:step)
         if tick != getbufvar('%', 'changedtick')
-            call s:echo_warn('reset **')
+            "call s:echo_warn('reset **')
             let elaps=0
         endif
         let elaps += a:step
@@ -252,7 +250,7 @@ function! s:PrepareInteractiveBuffer(cmd)
             if !empty(conq) && get(conq, 'active', 0)
                         \ && (get(conq, 'command', '') == a:cmd)
                 "already alive
-                if !g:liteRunner_ConqueTerm_reexec_always
+                if !g:liteRunner_ConqueTerm_renew_everytime
                     return [ibufno,idx] "reuse
                 endif
                 "call conq.close() " happens mapping errors
@@ -334,8 +332,8 @@ function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEn
     endif
 
     let pass_mode = a:withEntireContent ? 3 :
-                \ exists("g:liteRunner_ConqueTerm_contents_passing_mode") ?
-                \ g:liteRunner_ConqueTerm_contents_passing_mode : 1
+                \ exists("g:liteRunner_ConqueTerm_content_pass_mode") ?
+                \ g:liteRunner_ConqueTerm_content_pass_mode : 1
     let text_or_lines = s:GetPassingTextOrLines(a:lrange, pass_mode)
     let cmd=s:PreprocessCommandLine(a:cmd)
     " expands (%) in cmd

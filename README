@@ -1,58 +1,174 @@
-vim-liteRunner plugin v0.2 
+Title: liteRunner Vim plugin
+Version: 0.3
+Description: Supports Edit-Run-Edit cycle of your scripting
+Author: Junichi OKADOME <tome@tomesoft.net>
 
-Creator: Junichi OKADOME  <tome@tomesoft.net>
 
-Supports edit-run-edit cycle
+Concept:
+ Edit,Run,Edit cycle is a very essential work for software development.
+ Shebang (#!...) in your editing file is an explicit directive to run them.
+ Why not use it? It's effective more than any other complex settings.
+ liteRunner plugin supports your Edit,Run,Edit cycle simply.
 
-In default, shebang (#!...) line in your editing file is used to run it, if exists.
+
+Installation:
+ a). with vimball "liteRunner.vba" 
+     TODO: Prepare URL
+     If you got a vimball, do a typical way;
+        $ vim liteRunner.vba
+        $ :so %
+
+ b). from GitHub
+     You can get a newer version of liteRunner plugin from;
+        git://github.com/tomesoft/vim-literunner.git
+     with git clone command
+        $ cd ~/.vim/bundle
+        $ git clone git://github.com/tomesoft/vim-literunner.git
+        $ cd vim-literunner
+    Then copy stuffs into ~/.vim (on Windows, %USERPROFILE%\vimfiles)
+    or make a new vimball, see the chapter 'Making Vimball'
+
 
 Usage:
- 1. You can put this stuffs into ~/.vim/plugin/.
- 2. Add line to be loaded to your ~/.vimrc
-    :runtime plugin/literunner
- 3. In editing your script, key-in <Leader>g (in default, <Leader> mapped
+ General mode <Leader>g, <Leader>G
+ 1. In editing your script, key-in <Leader>g (in default, <Leader> mapped
     to backslash '\') runs your script and the result is shown in output window.
- 4. If you need to pass some command line arguments when run it, key-in
-    <Leader>G, cusor then cusor jumps into command line
+ 2. If you need to pass some command line arguments when run it, key-in
+    <Leader>G, then cusor jumps into command line like;
      :LRRunscript 
     input arguments (e.g. --help) and key-in return to run with the
     arguments.
      :LRRunscript --help
     (is evaluated like as /usr/bin/env python myscript.py --help)
- 5. The specified arguments (in Step 4) are held (in buffer locally), and that
+ 3. The specified arguments (in Step 2) are held (in buffer locally), and that
     will be re-used on next run with <Leader>g until change them (using
     <Leader>G) or finish editing.
- 
-Customize:
- 1. Key Mappings
- You can change mappings, as you like;
-  :noremap <Leader>g :LRRunScriptWithHeldArguments<CR>
-  :noremap <Leader>G :<C-\>e("LRRunScript " . LiteRunner#ExpandHeldScriptArguments())<CR>
- These 2 lines should be put before the line 'runtime plugin/literunner',
- to avoid multiple mapping.
-   
- 2. Some variables are for customization, their prefix is g:liteRunner_XXX.
- TODO: explains each items
- g:liteRunner_tries_to_use_shebang=0 (bool=0,1)
- g:liteRunner_uses_quickfix_on_error=1 (bool=0,1)
- g:liteRunner_shows_quickfix_on_error=1 (bool=0,1)
- g:liteRunner_checks_errors_always=0 (bool=0,1)
- g:liteRunner_windowheight_default=5 (num)
- g:liteRunner_windowheight_max=10 (num)
- g:liteRunner_ftyps_cmds_dict={dict of defaults} (dict)
- g:liteRunner_prognames_efms_dict={dictjmap of defaults}
 
- 3. Some functions are for customization, their prefix is LiteRunner#XXX
- TODO: explains each item
- LiteRunner#UpdateFtypsCmdsEntry(key, value)
- LiteRunner#UpdateFtypsEfmsEntry(key, value)
- LiteRunner#ExpandHeldScriptArguments()
+ Interactive mode <Leader>i, <Leader>I
+ 1. If you already installed ConqueTerm plugin (see http://code.google.com/p/conque),
+    can run in Interactive mode. <Leader>i opens a terminal with (hopefully) a REPL,
+    and if available a selection (in vim visual mode) , pass them to that terminal.
+ 2. To pass entire of your editing contents (forcibly), you can use <Leader>i for.
+ 3. Sometimes, when an interpreter is not able to use for a REPL, you might have to
+    change the Shebang line temporarily;
+       #!/usr/bin/env ruby => #!/usr/bin/env irb
+
+
+Customization:
+ 1. Key Mappings
+    You can change mappings, as you like;
+    :noremap <Leader>g :LRRunScriptWithHeldArguments<CR>
+    :noremap <Leader>G :<C-\>e("LRRunScript " . liteRunner#ExpandHeldScriptArguments())<CR>
+
+    for Interactive mode (required ConqueTerm plugin)
+    :noremap <Leader>i :LRRunScriptInteractively<CR>
+    :noremap <Leader>I :LRRunScriptInteractivelyWithEntireOfContent<CR>
+   
+ 2. Variables
+    Some variables are for customization, their prefix is g:liteRunner_XXX.
+    - g:liteRunner_tries_to_use_shebang=1 (bool=0,1)
+        A flag means whether to use Shebang or not.
+        When set to 0, uses entry of g:liteRunner_ftyps_cmds_dict.
+    - g:liteRunner_uses_quickfix_on_error=1 (bool=0,1)
+        A flag means whether to use quickfix or not on error
+    - g:liteRunner_shows_quickfix_on_error=1 (bool=0,1)
+        A flag whether show quickfix (with :cope) or not.
+    - g:liteRunner_checks_errors_always=0 (bool=0,1)
+        A flag wheter check errors (include exitcode==0) or not.
+    - g:liteRunner_windowheight_default=5 (num)
+        Default (initial) height of the output window. A Number of output
+        lines are greater than the hight, the window height will be resized
+        up to g:liteRunner_windowheight_max
+    - g:liteRunner_windowheight_max=10 (num)
+        Maximum height of the output window. A Number of output lines
+        are greater than the height, the window height will be resized
+        up to this value.
+    - g:liteRunner_ftyps_cmds_dict={dict of defaults} (dict)
+        Dictionary, contains entries of filetype and respoinding commands.
+        That is used when not use Shebang (no Shebang in editing content or
+        g:liteRunner_tries_to_use_shebang set to 0).
+        Format of an entry;
+        'ruby' : ['/usr/bin/env ruby', '/usr/bin/env irb']
+        Key is a filetype, confirms with :echo &filetype.
+        Value is list of command lines, index=0 is for Generic mode,
+        and index=1 is for Interactive mode (optional).
+        It is better to use function liteRunner#UpdateFtypsCmdsEntry(),
+        to add/replace a part of entry (not whole dictionary).
+    - g:liteRunner_prognames_efms_dict={dict of defaults} (dict)
+        Dictionary, contains entries of program name and responding error formats.
+        When a program exited with error code (not 0), check to contain specific
+        errors in its output.
+        Format of an entry;
+        'python' : [
+                \ '%A\ \ File\ \"%f\"\\,\ line\ %l',
+                \ '%A\ \ File\ \"%f\"\\,\ line\ %l\\,\ %m',
+                \ '%-C\ \ %p^',
+                \ '%+C\ \ \ \ %s',
+                \ '%+C%*[^\ :]%trror:\ %m',
+                \]
+        Key is a program name, e.g. python, ruby, gosh, ...
+        Value is a list of element of errorformat, eventually join with ','
+        then set to errorformat.
+        It is better to use function liteRunner#UpdatePrognamesEfmsEntry(),
+        to add/replace a part of entry (not whole dictionary).
+
+    For Interactive mode
+    - g:liteRunner_ConqueTerm_command='ConqueTermSplit'
+        Command is to open a terminal window in interactive mode.
+    - g:liteRunner_ConqueTerm_renew_everytime=0
+        A flag means whether renew terminal window everytime or not.
+    - g:liteRunner_ConqueTerm_content_pass_mode=1
+        Mode value means how pass a content to terminal,
+        0=never pass, 1=selection only, 2=entire of content.
+
+ 3. There are some functions for customize, their prefix is liteRunner#XXX
+    - liteRunner#UpdateFtypsCmdsEntry(key, value)
+      see the variable g:liteRunner_ftyps_cmds_dict
+    - liteRunner#UpdatePrognamesEfmsEntry(key, value)
+      see the variable g:liteRunner_prognames_efms_dict
+
 
 ChangeLog:
 2011-05-25  Junichi OKADOME  <tome@tomesoft.net>
     * NEW newly created and versioned v0.1
       tested on MacOSX Vim7.3
+2011-05-31  Junichi OKADOME  <tome@tomesoft.net>
+    * NEW introduced Interactive mode (required ConqueTerm plugin)
+    * CHG supports autoloading
+      tested on MacOSX Vim7.3 and Windows7 gVim7.2
+
+
+Making Vimball:
+To make a vimball "liteRunner.vba", run the following line in ':' mode
+/^Files:/+1,/^--- end/-1MkVimball! liteRunner .
+
 
 Files:
-autoload/literunner.vim
-plugin/literunner.vim
+autoload/liteRunner.vim
+plugin/liteRunner.vim
+--- end of files ---
+
+
+License:
+
+The MIT License (MIT)
+Copyright (c) 2011 Junichi OKADOME
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
