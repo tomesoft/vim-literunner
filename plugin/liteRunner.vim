@@ -45,7 +45,7 @@ endif
 
 " ConqueTerm Command
 "if !exists("g:liteRunner_ConqueTerm_command") && exists(":ConqueTerm")
-    "let g:liteRunner_ConqueTerm_command='ConqueTermSplit'
+"    let g:liteRunner_ConqueTerm_command='ConqueTermSplit'
 "endif
 
 " flag renew ConqueTerm everytime or not
@@ -162,7 +162,8 @@ endif
 "
 if !hasmapto('LRRunScriptInteractively')
     if mapcheck('<Leader>i') == ''
-        :noremap <Leader>i :LRRunScriptInteractively<CR>
+        :nnoremap <Leader>i :LRRunScriptInteractively<CR>
+        :vnoremap <Leader>i :LRRunScriptInteractivelyV<CR>
     endif
 endif
 
@@ -191,8 +192,11 @@ endif
 command! -nargs=* -range=% LRRunScript :call liteRunner#RunScript(<line1>, <line2>, <q-args>)
 command! -nargs=0 -range=% LRRunScriptWithHeldArguments :call liteRunner#RunScriptWithHeldArguments(<line1>, <line2>)
 command! -nargs=0 LREditHeldArguments :call liteRunner#EditHeldArgumentsInCmdline()
-command! -nargs=0 -range=% LRRunScriptInteractively :call liteRunner#RunScriptInteractively(<line1>, <line2>)
+command! -nargs=0 -range=% LRRunScriptInteractively :call liteRunner#RunScriptInteractively(<line1>, <line2>, 0)
+" for Visual mode
+command! -nargs=0 -range LRRunScriptInteractivelyV :call liteRunner#RunScriptInteractively(<line1>, <line2>, 1)
 command! -nargs=0 -range=% LRRunScriptInteractivelyWithEntireOfContent :call liteRunner#RunScriptInteractivelyWithEntireOfContent()
+command! -nargs=0 -range LRD :call liteRunner#DebugFunc(<line1>, <line2>)
 
 
 "vim:ts=8:sts=4:sw=4:et
