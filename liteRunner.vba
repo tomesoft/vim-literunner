@@ -2,7 +2,7 @@
 UseVimball
 finish
 autoload/liteRunner.vim	[[[1
-580
+594
 " File: autoload/liteRunner.vim
 " Version: 0.3
 "
@@ -14,6 +14,14 @@ autoload/liteRunner.vim	[[[1
 "
 " functions
 "
+
+" set REPL program for interactive execution
+"function! liteRunner#SetReplProgram(value)
+"    let b:REPL=value
+"endfunction
+function! liteRunner#DebugFunc(s, e)
+    echohl WarningMsg | echo 'mode='.mode(' ').' start='.a:s.' end='.a:e | echohl None
+endfunction
 
 " update or add entry of the ftyps_cmds_dict
 " value type is expected list or string
@@ -74,9 +82,9 @@ function! liteRunner#RunScriptWithHeldArguments(rstart, rend)
 endfunction
 
 " RunScriptInteractively function calld via Command
-function! liteRunner#RunScriptInteractively(rstart, rend)
+function! liteRunner#RunScriptInteractively(rstart, rend, invisual)
     call s:RunScriptImpl([], [a:rstart, a:rend],
-                \ {'interactively':1})
+                \ {'interactively':1, 'invisual':a:invisual})
 endfunction
 "
 " RunScriptInteractivelyWithEntireOfContent function calld via Command
@@ -110,6 +118,7 @@ function! s:RunScriptImpl(lsargs, lrange, options)
     let cmd = ''
     let interactively = get(a:options, 'interactively', 0)
     let forcibly_with_entire_content = get(a:options, 'withEntireContent', 0)
+    let invisual = get(a:options, 'invisual', 0)
     if g:liteRunner_tries_to_use_shebang
         "try to find shebang #! of current buffer
         let cmd = s:GetShebangCommand()
@@ -125,11 +134,16 @@ function! s:RunScriptImpl(lsargs, lrange, options)
         endif
     endif
 
+    " override the cmd with b:REPL variable
+    if interactively && !empty(getbufvar('%', 'REPL'))
+        let cmd = getbufvar('%', 'REPL')
+    endif
+
     if !empty(cmd)
         let bufhdr = s:GetProgname(cmd)
         if interactively
             call s:RunCurrentBufferInteractively(cmd, bufhdr, a:lsargs, a:lrange,
-                        \ forcibly_with_entire_content)
+                        \ forcibly_with_entire_content, invisual)
         else
             call s:RunCurrentBufferAsScript(cmd, bufhdr, a:lsargs, a:lrange)
         endif
@@ -244,7 +258,7 @@ function! s:InputToConqueTerm(conqterm, text_or_lines)
 endfunction
 
 " returns list [bufnr, conque_term_idx]
-function! s:PrepareInteractiveBuffer(cmd)
+function! s:PrepareInteractiveBuffer(cmd, waits)
     call s:RegisterCallbacks()
     let cbufno = bufnr('%')
     let ibufno = s:GetAliveInteraciveBufferNumber()
@@ -280,13 +294,15 @@ function! s:PrepareInteractiveBuffer(cmd)
             let idx = get(conq, 'idx', 0)
             call setbufvar(cbufno, "liteRunner_conque_term_index", idx)
             call s:SetOwnerBuffer(ibufno, cbufno)
+            " set syntax same as the owners
+            execute 'setlocal syntax=' . getbufvar(cbufno, '&syntax')
             if has('localmap')
                 " buffer local map <CR> jump back to previous window
                 "nnoremap <silent> <buffer> <CR> :wincmd p<CR>
                 nnoremap <silent> <buffer> <CR> :call liteRunner#JumpToOwnerBuffer()<CR>
             endif
-            "TODO: To solve a problem that is lacked the first input line, in gvim on Windows
-            call s:WaitUntilCannotRead(conq, 2000, 1)
+            "TODO: To avoid a problem that is lacked the first input line, in gvim on Windows
+            if a:waits | call s:WaitUntilCannotRead(conq, 2000, 1) | endif
             return [ibufno, idx]
         endif
     endif
@@ -295,26 +311,24 @@ function! s:PrepareInteractiveBuffer(cmd)
 endfunction
 
 " returns string or list of lines
-function! s:GetPassingTextOrLines(lrange, mode)
+function! s:GetPassingTextOrLines(lrange, mode, invisual)
     let pass_mode = a:mode
     if pass_mode == 0 | return '' | endif
 
     if pass_mode <= 2
-        "TODO: need to respond the select mode
-        let lastVisualMode = visualmode(" ") "get and clear visualmode
-        if empty(lastVisualMode) && (a:lrange[0] != 1 || a:lrange[1] != line('$'))
+        if empty(a:invisual) && (a:lrange[0] != 1 || a:lrange[1] != line('$'))
             "given the specific range e.g. /^#/,5
             return getline(a:lrange[0], a:lrange[1])
         endif
 
-        if !empty(lastVisualMode)
+        if !empty(a:invisual)
             "if lastVisualMode == 'v' or <C-V> blockmode
             let svreg = @@
             " redo the visual selection and yank it
             silent execute 'normal! gvy'
             let lresult = split(@@, '[\r\n]')
             let @@ = svreg
-            call visualmode(' ') "clear last visualmode
+            "call visualmode(' ') "clear last visualmode
             return lresult
         endif
     endif
@@ -330,7 +344,7 @@ endfunction
 "
 " run contents of current buffer interactively
 "
-function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEntireContent)
+function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEntireContent, invisual)
     if !exists(':ConqueTerm')
         call s:echo_warn('ConqueTerm plugin required!')
         return
@@ -339,12 +353,12 @@ function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEn
     let pass_mode = a:withEntireContent ? 3 :
                 \ exists("g:liteRunner_ConqueTerm_content_pass_mode") ?
                 \ g:liteRunner_ConqueTerm_content_pass_mode : 1
-    let text_or_lines = s:GetPassingTextOrLines(a:lrange, pass_mode)
+    let text_or_lines = s:GetPassingTextOrLines(a:lrange, pass_mode, a:invisual)
     let cmd=s:PreprocessCommandLine(a:cmd)
     " expands (%) in cmd
     let cmd=s:ExpandWithSpecifiedPath(cmd, expand('%:t'))
 
-    let lbufspec = s:PrepareInteractiveBuffer(cmd)
+    let lbufspec = s:PrepareInteractiveBuffer(cmd, len(text_or_lines) > 0)
     if !empty(lbufspec)
         " jump to the interactive buffer
         let winnr = bufwinnr(lbufspec[0])
@@ -480,7 +494,7 @@ function! s:RunScriptFile(cmd, fpath, buftitle, lsargs)
     let buftitle0=fnameescape(buftitle)
     let bufno = s:FindBufferWithTitle(buftitle)
     if bufno > 0 && bufexists(bufno)
-        execute bufno."bdelete!"
+        execute bufno."bwipeout!"
     endif
 
     if g:liteRunner_shows_quickfix_on_error
@@ -584,7 +598,7 @@ endfunction
 
 "vim:ts=8:sts=4:sw=4:et
 plugin/liteRunner.vim	[[[1
-198
+202
 " File: plugin/liteRunner.vim
 " Version: 0.3
 "
@@ -632,7 +646,7 @@ endif
 
 " ConqueTerm Command
 "if !exists("g:liteRunner_ConqueTerm_command") && exists(":ConqueTerm")
-    "let g:liteRunner_ConqueTerm_command='ConqueTermSplit'
+"    let g:liteRunner_ConqueTerm_command='ConqueTermSplit'
 "endif
 
 " flag renew ConqueTerm everytime or not
@@ -749,7 +763,8 @@ endif
 "
 if !hasmapto('LRRunScriptInteractively')
     if mapcheck('<Leader>i') == ''
-        :noremap <Leader>i :LRRunScriptInteractively<CR>
+        :nnoremap <Leader>i :LRRunScriptInteractively<CR>
+        :vnoremap <Leader>i :LRRunScriptInteractivelyV<CR>
     endif
 endif
 
@@ -778,8 +793,11 @@ endif
 command! -nargs=* -range=% LRRunScript :call liteRunner#RunScript(<line1>, <line2>, <q-args>)
 command! -nargs=0 -range=% LRRunScriptWithHeldArguments :call liteRunner#RunScriptWithHeldArguments(<line1>, <line2>)
 command! -nargs=0 LREditHeldArguments :call liteRunner#EditHeldArgumentsInCmdline()
-command! -nargs=0 -range=% LRRunScriptInteractively :call liteRunner#RunScriptInteractively(<line1>, <line2>)
+command! -nargs=0 -range=% LRRunScriptInteractively :call liteRunner#RunScriptInteractively(<line1>, <line2>, 0)
+" for Visual mode
+command! -nargs=0 -range LRRunScriptInteractivelyV :call liteRunner#RunScriptInteractively(<line1>, <line2>, 1)
 command! -nargs=0 -range=% LRRunScriptInteractivelyWithEntireOfContent :call liteRunner#RunScriptInteractivelyWithEntireOfContent()
+command! -nargs=0 -range LRD :call liteRunner#DebugFunc(<line1>, <line2>)
 
 
 "vim:ts=8:sts=4:sw=4:et
