@@ -2,9 +2,9 @@
 UseVimball
 finish
 autoload/liteRunner.vim	[[[1
-594
+622
 " File: autoload/liteRunner.vim
-" Version: 0.3
+" Version: 0.4
 "
 " liteRunner plugin 
 "
@@ -14,14 +14,6 @@ autoload/liteRunner.vim	[[[1
 "
 " functions
 "
-
-" set REPL program for interactive execution
-"function! liteRunner#SetReplProgram(value)
-"    let b:REPL=value
-"endfunction
-function! liteRunner#DebugFunc(s, e)
-    echohl WarningMsg | echo 'mode='.mode(' ').' start='.a:s.' end='.a:e | echohl None
-endfunction
 
 " update or add entry of the ftyps_cmds_dict
 " value type is expected list or string
@@ -53,6 +45,11 @@ function! liteRunner#ExpandHeldScriptArguments()
     endif
 endfunction
 
+" expand REPL
+function! liteRunner#ExpandRepl()
+    return s:GetCommand(1)
+endfunction
+
 " edit the arguments without running
 function! s:EditHeldArgumentsInCmdline()
     let heldtxt=join(b:liteRunner_held_script_arguments, ' ')
@@ -79,6 +76,12 @@ function! liteRunner#RunScriptWithHeldArguments(rstart, rend)
     endif
     call s:RunScriptImpl(arg, [a:rstart, a:rend],
                 \ {})
+endfunction
+
+" RunRepl function called via command
+function! liteRunner#RunRepl(rstart, rend, ...)
+    let b:REPL = join(a:000, ' ')
+    call liteRunner#RunScriptInteractively(a:rstart, a:rend, 0)
 endfunction
 
 " RunScriptInteractively function calld via Command
@@ -113,17 +116,18 @@ function! s:GetCommandListFromFtypsCmdsDict()
     return get(g:liteRunner_ftyps_cmds_dict, &filetype, [])
 endfunction
 
-"
-function! s:RunScriptImpl(lsargs, lrange, options)
+"Get command to execute on a specified mode
+function! s:GetCommand(interactively)
+    let interactively = !empty(a:interactively)
     let cmd = ''
-    let interactively = get(a:options, 'interactively', 0)
-    let forcibly_with_entire_content = get(a:options, 'withEntireContent', 0)
-    let invisual = get(a:options, 'invisual', 0)
-    if g:liteRunner_tries_to_use_shebang
+    let repl = getbufvar('%', 'REPL')
+    if interactively && !empty(repl)
+        let cmd = repl
+    endif
+    if empty(cmd) && g:liteRunner_tries_to_use_shebang
         "try to find shebang #! of current buffer
         let cmd = s:GetShebangCommand()
     endif
-
     "shebang not found or not tried
     if empty(cmd)
         let lstcmd=s:GetCommandListFromFtypsCmdsDict()
@@ -133,11 +137,35 @@ function! s:RunScriptImpl(lsargs, lrange, options)
             let cmd = get(lstcmd, (interactively? 1 : 0), lstcmd[0])
         endif
     endif
+    return cmd
+endfunction
 
-    " override the cmd with b:REPL variable
-    if interactively && !empty(getbufvar('%', 'REPL'))
-        let cmd = getbufvar('%', 'REPL')
-    endif
+"
+function! s:RunScriptImpl(lsargs, lrange, options)
+    let cmd = ''
+    let interactively = get(a:options, 'interactively', 0)
+    let forcibly_with_entire_content = get(a:options, 'withEntireContent', 0)
+    let invisual = get(a:options, 'invisual', 0)
+    ""if g:liteRunner_tries_to_use_shebang
+    ""    "try to find shebang #! of current buffer
+    ""    let cmd = s:GetShebangCommand()
+    ""endif
+
+    """shebang not found or not tried
+    ""if empty(cmd)
+    ""    let lstcmd=s:GetCommandListFromFtypsCmdsDict()
+    ""    if empty(lstcmd)
+    ""        call s:echo_warn("cannot run the typeof " . (!empty(&filetype) ? &filetype : '*None*'))
+    ""    else
+    ""        let cmd = get(lstcmd, (interactively? 1 : 0), lstcmd[0])
+    ""    endif
+    ""endif
+
+    """ override the cmd with b:REPL variable
+    ""if interactively && !empty(getbufvar('%', 'REPL'))
+    ""    let cmd = getbufvar('%', 'REPL')
+    ""endif
+    let cmd = s:GetCommand(interactively)
 
     if !empty(cmd)
         let bufhdr = s:GetProgname(cmd)
@@ -596,11 +624,11 @@ function! s:PreprocessCommandLine(cmd)
     return a:cmd
 endfunction
 
-"vim:ts=8:sts=4:sw=4:et
+" vim:ts=8:sts=4:sw=4:et
 plugin/liteRunner.vim	[[[1
-202
+208
 " File: plugin/liteRunner.vim
-" Version: 0.3
+" Version: 0.4
 "
 " liteRunner plugin
 "
@@ -768,9 +796,15 @@ if !hasmapto('LRRunScriptInteractively')
     endif
 endif
 
-if !hasmapto('LRRunScriptInteractivelyWithEntireOfContent')
+"if !hasmapto('LRRunScriptInteractivelyWithEntireOfContent')
+"    if mapcheck('<Leader>I') == ''
+"        :noremap <Leader>I :LRRunScriptInteractivelyWithEntireOfContent<CR>
+"    endif
+"endif
+
+if !hasmapto('LRRunRepl')
     if mapcheck('<Leader>I') == ''
-        :noremap <Leader>I :LRRunScriptInteractivelyWithEntireOfContent<CR>
+        :nnoremap <Leader>I :<C-\>e("LRRunRepl " . liteRunner#ExpandRepl())<CR>
     endif
 endif
 
@@ -793,11 +827,11 @@ endif
 command! -nargs=* -range=% LRRunScript :call liteRunner#RunScript(<line1>, <line2>, <q-args>)
 command! -nargs=0 -range=% LRRunScriptWithHeldArguments :call liteRunner#RunScriptWithHeldArguments(<line1>, <line2>)
 command! -nargs=0 LREditHeldArguments :call liteRunner#EditHeldArgumentsInCmdline()
+command! -nargs=* -range=% LRRunRepl :call liteRunner#RunRepl(<line1>, <line2>, <q-args>)
 command! -nargs=0 -range=% LRRunScriptInteractively :call liteRunner#RunScriptInteractively(<line1>, <line2>, 0)
 " for Visual mode
 command! -nargs=0 -range LRRunScriptInteractivelyV :call liteRunner#RunScriptInteractively(<line1>, <line2>, 1)
 command! -nargs=0 -range=% LRRunScriptInteractivelyWithEntireOfContent :call liteRunner#RunScriptInteractivelyWithEntireOfContent()
-command! -nargs=0 -range LRD :call liteRunner#DebugFunc(<line1>, <line2>)
 
 
-"vim:ts=8:sts=4:sw=4:et
+" vim:ts=8:sts=4:sw=4:et
