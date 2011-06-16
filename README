@@ -1,5 +1,5 @@
 Title: liteRunner Vim plugin
-Version: 0.3
+Version: 0.4
 Description: Supports Edit-Run-Edit cycle of your scripting
 Author: Junichi OKADOME <tome@tomesoft.net>
 
@@ -48,10 +48,17 @@ Usage:
  1. If you already installed ConqueTerm plugin (see http://code.google.com/p/conque),
     can run in Interactive mode. <Leader>i opens a terminal with (hopefully) a REPL,
     and if available a selection (in vim visual mode) , pass them to that terminal.
- 2. To pass entire of your editing contents (forcibly), you can use <Leader>i for.
- 3. Sometimes, when an interpreter is not able to use for a REPL, you might have to
-    change the Shebang line temporarily;
-       #!/usr/bin/env ruby => #!/usr/bin/env irb
+ 2. To specify a REPL program, use <Leader>I. Command line will be shown as; 
+     :LRRunRepl /usr/bin/env ruby
+    These are current setting (getting from shebang or something), and you can rewrite
+    to the line like;
+     :LRRunRepl /usr/bin/env irb
+    then key-in return to run that command line for interactive mode.
+    Once it is specified, that value is held in variable b:REPL, and will re-use
+    until change it.
+ 3. When an interactive (REPL running) terminal opened, select lines in editing buffer
+    via visual mode (v, V or Ctrl-V) then key-in <Leader>i, the selection will be
+    passed into the REPL (and it will be evaluated).
 
 
 Customization:
@@ -62,7 +69,7 @@ Customization:
 
     for Interactive mode (required ConqueTerm plugin)
     :noremap <Leader>i :LRRunScriptInteractively<CR>
-    :noremap <Leader>I :LRRunScriptInteractivelyWithEntireOfContent<CR>
+    :nnoremap <Leader>I :<C-\>e("LRRunRepl " . liteRunner#ExpandRepl())<CR>
    
  2. Variables
     Some variables are for customization, their prefix is g:liteRunner_XXX.
@@ -136,7 +143,9 @@ ChangeLog:
     * NEW introduced Interactive mode (required ConqueTerm plugin)
     * CHG supports autoloading
       tested on MacOSX Vim7.3 and Windows7 gVim7.2
-
+2011-06-17  Junichi OKADOME  <tome@tomesoft.net>
+    * CHG Now a REPL can be specified with <Leader>I
+      (The old command which mapped <Leader>I has been obsolete)
 
 Making Vimball:
 To make a vimball "liteRunner.vba", run the following line in ':' mode

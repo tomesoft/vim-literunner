@@ -1,5 +1,5 @@
 " File: plugin/liteRunner.vim
-" Version: 0.3
+" Version: 0.4
 "
 " liteRunner plugin
 "
@@ -167,9 +167,15 @@ if !hasmapto('LRRunScriptInteractively')
     endif
 endif
 
-if !hasmapto('LRRunScriptInteractivelyWithEntireOfContent')
+"if !hasmapto('LRRunScriptInteractivelyWithEntireOfContent')
+"    if mapcheck('<Leader>I') == ''
+"        :noremap <Leader>I :LRRunScriptInteractivelyWithEntireOfContent<CR>
+"    endif
+"endif
+
+if !hasmapto('LRRunRepl')
     if mapcheck('<Leader>I') == ''
-        :noremap <Leader>I :LRRunScriptInteractivelyWithEntireOfContent<CR>
+        :nnoremap <Leader>I :<C-\>e("LRRunRepl " . liteRunner#ExpandRepl())<CR>
     endif
 endif
 
@@ -192,11 +198,11 @@ endif
 command! -nargs=* -range=% LRRunScript :call liteRunner#RunScript(<line1>, <line2>, <q-args>)
 command! -nargs=0 -range=% LRRunScriptWithHeldArguments :call liteRunner#RunScriptWithHeldArguments(<line1>, <line2>)
 command! -nargs=0 LREditHeldArguments :call liteRunner#EditHeldArgumentsInCmdline()
+command! -nargs=* -range=% LRRunRepl :call liteRunner#RunRepl(<line1>, <line2>, <q-args>)
 command! -nargs=0 -range=% LRRunScriptInteractively :call liteRunner#RunScriptInteractively(<line1>, <line2>, 0)
 " for Visual mode
 command! -nargs=0 -range LRRunScriptInteractivelyV :call liteRunner#RunScriptInteractively(<line1>, <line2>, 1)
 command! -nargs=0 -range=% LRRunScriptInteractivelyWithEntireOfContent :call liteRunner#RunScriptInteractivelyWithEntireOfContent()
-command! -nargs=0 -range LRD :call liteRunner#DebugFunc(<line1>, <line2>)
 
 
-"vim:ts=8:sts=4:sw=4:et
+" vim:ts=8:sts=4:sw=4:et
