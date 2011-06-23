@@ -1,5 +1,5 @@
 Title: liteRunner Vim plugin
-Version: 0.4
+Version: 0.5
 Description: Supports Edit-Run-Edit cycle of your scripting
 Author: Junichi OKADOME <tome@tomesoft.net>
 
@@ -12,21 +12,24 @@ Concept:
 
 
 Installation:
- a). with vimball "liteRunner.vba" 
-     TODO: Prepare URL
-     If you got a vimball, do a typical way;
+ a). with a Vimball "liteRunner.vba" 
+     Download an archive from GitHub service;
+     https://github.com/tomesoft/vim-literunner/archives/master
+     You can choose either tar.gz or zip. Then extract it
+     to get contained Vimball.
         $ vim liteRunner.vba
         $ :so %
 
- b). from GitHub
+ b). from GitHub with git
      You can get a newer version of liteRunner plugin from;
         git://github.com/tomesoft/vim-literunner.git
      with git clone command
         $ cd ~/.vim/bundle
         $ git clone git://github.com/tomesoft/vim-literunner.git
-        $ cd vim-literunner
-    Then copy stuffs into ~/.vim (on Windows, %USERPROFILE%\vimfiles)
-    or make a new vimball, see the chapter 'Making Vimball'
+    If you have already introduced a plugin manager like "pathogen"
+    (https://github.com/Raimondi/vim-pathogen), you should follow that
+    plugin manager's way. Otherwise copy stuffs into ~/.vim directly
+    (on Windows, %USERPROFILE%\vimfiles) with contained Vimball.
 
 
 Usage:
@@ -36,7 +39,7 @@ Usage:
  2. If you need to pass some command line arguments when run it, key-in
     <Leader>G, then cusor jumps into command line like;
      :LRRunscript 
-    input arguments (e.g. --help) and key-in return to run with the
+    input arguments (e.g. --help) and press return to run with the
     arguments.
      :LRRunscript --help
     (is evaluated like as /usr/bin/env python myscript.py --help)
@@ -45,17 +48,21 @@ Usage:
     <Leader>G) or finish editing.
 
  Interactive mode <Leader>i, <Leader>I
- 1. If you already installed ConqueTerm plugin (see http://code.google.com/p/conque),
-    can run in Interactive mode. <Leader>i opens a terminal with (hopefully) a REPL,
-    and if available a selection (in vim visual mode) , pass them to that terminal.
+ 1. If you already installed either
+     - ConqueTerm plugin (http://code.google.com/p/conque),
+    or
+     - VimShell plugin (https://github.com/Shougo/vimshell/)
+    Interactive mode will be available to use. <Leader>i opens a terminal with
+    (hopefully) a REPL, and if existing a selection (in vim visual mode),
+    pass them to that interactive terminal.
  2. To specify a REPL program, use <Leader>I. Command line will be shown as; 
      :LRRunRepl /usr/bin/env ruby
-    These are current setting (getting from shebang or something), and you can rewrite
-    to the line like;
+    These are current setting (getting from shebang or something), and you can edit
+    the line like;
      :LRRunRepl /usr/bin/env irb
-    then key-in return to run that command line for interactive mode.
-    Once it is specified, that value is held in variable b:REPL, and will re-use
-    until change it.
+    then press return to run that command line for interactive mode.
+    Once it is specified, that value is held in variable b:liteRunner_REPL, and will
+    re-use until change it.
  3. When an interactive (REPL running) terminal opened, select lines in editing buffer
     via visual mode (v, V or Ctrl-V) then key-in <Leader>i, the selection will be
     passed into the REPL (and it will be evaluated).
@@ -120,11 +127,18 @@ Customization:
         to add/replace a part of entry (not whole dictionary).
 
     For Interactive mode
+    - g:liteRunner_uses_ConqueTerm=0
+    - g:liteRunner_uses_VimShell=0
+        If you installed both ConqueTerm and VimShell, to specify
+        which should be used for interactive mode. By default,
+        tries to use in order as at first ConqueTerm, next VimShell.
     - g:liteRunner_ConqueTerm_command='ConqueTermSplit'
-        Command is to open a terminal window in interactive mode.
-    - g:liteRunner_ConqueTerm_renew_everytime=0
+        Command is to open an interactive terminal with ConqueTerm.
+    - g:liteRunner_VimShell_command='VimShellInteractive'
+        Command is to open an interactive terminal with VimShell.
+    - g:liteRunner_interactive_buffer_renew_everytime=0
         A flag means whether renew terminal window everytime or not.
-    - g:liteRunner_ConqueTerm_content_pass_mode=1
+    - g:liteRunner_interactive_content_pass_mode=1
         Mode value means how pass a content to terminal,
         0=never pass, 1=selection only, 2=entire of content.
 

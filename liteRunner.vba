@@ -2,9 +2,9 @@
 UseVimball
 finish
 autoload/liteRunner.vim	[[[1
-622
+714
 " File: autoload/liteRunner.vim
-" Version: 0.4
+" Version: 0.5
 "
 " liteRunner plugin 
 "
@@ -17,58 +17,58 @@ autoload/liteRunner.vim	[[[1
 
 " update or add entry of the ftyps_cmds_dict
 " value type is expected list or string
-function! liteRunner#UpdateFtypsCmdsEntry(key, value)
+function! liteRunner#UpdateFtypsCmdsEntry(key, value) "{{{
     let g:liteRunner_ftyps_cmds_dict[a:key] = 
                 \ type(a:value) == type([]) ? a:value :
                 \ type(a:value) == type('') ? [a:value] :
                 \ []
-endfunction
+endfunction "}}}
 
 " update or add entry of the prognames_efms_dict
 " value type is expected list or string
-function! liteRunner#UpdatePrognamesEfmsEntry(key, value)
+function! liteRunner#UpdatePrognamesEfmsEntry(key, value) "{{{
     let g:liteRunner_prognames_efms_dict[a:key] = 
                 \ type(a:value) == type([]) ? a:value :
                 \ type(a:value) == type('') ? [a:value] :
                 \ []
-endfunction
+endfunction "}}}
 
 "holds script arguments that ran lastly
 let b:liteRunner_held_script_arguments=[]
 
 " expand the held arguments
-function! liteRunner#ExpandHeldScriptArguments()
+function! liteRunner#ExpandHeldScriptArguments() "{{{
     if exists("b:liteRunner_held_script_arguments")
         return join(b:liteRunner_held_script_arguments, ' ')
     else
         return ''
     endif
-endfunction
+endfunction "}}}
 
 " expand REPL
-function! liteRunner#ExpandRepl()
+function! liteRunner#ExpandRepl() "{{{
     return s:GetCommand(1)
-endfunction
+endfunction "}}}
 
 " edit the arguments without running
-function! s:EditHeldArgumentsInCmdline()
+function! s:EditHeldArgumentsInCmdline() "{{{
     let heldtxt=join(b:liteRunner_held_script_arguments, ' ')
     call inputsave()
     let intxt=input('(edit args): ', heldtxt)
     call inputrestore()
     let b:liteRunner_held_script_arguments = split(intxt)
-endfunction
+endfunction "}}}
 
 " RunScript function called via Command
-function! liteRunner#RunScript(rstart, rend, ...)
+function! liteRunner#RunScript(rstart, rend, ...) "{{{
     " save arguments to use later in RunScriptWithHeldArguments()
     let b:liteRunner_held_script_arguments=a:000
     call s:RunScriptImpl(b:liteRunner_held_script_arguments, [a:rstart, a:rend],
                 \ {})
-endfunction
+endfunction "}}}
 
 " RunScriptWithHeldArguments function called via Command
-function! liteRunner#RunScriptWithHeldArguments(rstart, rend)
+function! liteRunner#RunScriptWithHeldArguments(rstart, rend) "{{{
     let arg=[]
     if exists("b:liteRunner_held_script_arguments")
         let arg=b:liteRunner_held_script_arguments
@@ -76,29 +76,29 @@ function! liteRunner#RunScriptWithHeldArguments(rstart, rend)
     endif
     call s:RunScriptImpl(arg, [a:rstart, a:rend],
                 \ {})
-endfunction
+endfunction "}}}
 
 " RunRepl function called via command
-function! liteRunner#RunRepl(rstart, rend, ...)
-    let b:REPL = join(a:000, ' ')
+function! liteRunner#RunRepl(rstart, rend, ...) "{{{
+    let b:liteRunner_REPL = join(a:000, ' ')
     call liteRunner#RunScriptInteractively(a:rstart, a:rend, 0)
-endfunction
+endfunction "}}}
 
 " RunScriptInteractively function calld via Command
-function! liteRunner#RunScriptInteractively(rstart, rend, invisual)
+function! liteRunner#RunScriptInteractively(rstart, rend, invisual) "{{{
     call s:RunScriptImpl([], [a:rstart, a:rend],
                 \ {'interactively':1, 'invisual':a:invisual})
-endfunction
+endfunction "}}}
 "
 " RunScriptInteractivelyWithEntireOfContent function calld via Command
-function! liteRunner#RunScriptInteractivelyWithEntireOfContent()
+function! liteRunner#RunScriptInteractivelyWithEntireOfContent() "{{{
     call s:RunScriptImpl([], [],
                 \{'interactively':1, 'withEntireContent':1})
-endfunction
+endfunction "}}}
 
 
 " analyze the shebang line and returns their command line string
-function! s:GetShebangCommand()
+function! s:GetShebangCommand() "{{{
     let cmd = ''
     let line=getline(1)
     if line =~ '^#!'
@@ -110,17 +110,17 @@ function! s:GetShebangCommand()
         endif
     endif
     return cmd
-endfunction
+endfunction "}}}
 
-function! s:GetCommandListFromFtypsCmdsDict()
+function! s:GetCommandListFromFtypsCmdsDict() "{{{
     return get(g:liteRunner_ftyps_cmds_dict, &filetype, [])
-endfunction
+endfunction "}}}
 
 "Get command to execute on a specified mode
-function! s:GetCommand(interactively)
+function! s:GetCommand(interactively) "{{{
     let interactively = !empty(a:interactively)
     let cmd = ''
-    let repl = getbufvar('%', 'REPL')
+    let repl = getbufvar('%', 'liteRunner_REPL')
     if interactively && !empty(repl)
         let cmd = repl
     endif
@@ -138,33 +138,14 @@ function! s:GetCommand(interactively)
         endif
     endif
     return cmd
-endfunction
+endfunction "}}}
 
 "
-function! s:RunScriptImpl(lsargs, lrange, options)
+function! s:RunScriptImpl(lsargs, lrange, options) "{{{
     let cmd = ''
     let interactively = get(a:options, 'interactively', 0)
     let forcibly_with_entire_content = get(a:options, 'withEntireContent', 0)
     let invisual = get(a:options, 'invisual', 0)
-    ""if g:liteRunner_tries_to_use_shebang
-    ""    "try to find shebang #! of current buffer
-    ""    let cmd = s:GetShebangCommand()
-    ""endif
-
-    """shebang not found or not tried
-    ""if empty(cmd)
-    ""    let lstcmd=s:GetCommandListFromFtypsCmdsDict()
-    ""    if empty(lstcmd)
-    ""        call s:echo_warn("cannot run the typeof " . (!empty(&filetype) ? &filetype : '*None*'))
-    ""    else
-    ""        let cmd = get(lstcmd, (interactively? 1 : 0), lstcmd[0])
-    ""    endif
-    ""endif
-
-    """ override the cmd with b:REPL variable
-    ""if interactively && !empty(getbufvar('%', 'REPL'))
-    ""    let cmd = getbufvar('%', 'REPL')
-    ""endif
     let cmd = s:GetCommand(interactively)
 
     if !empty(cmd)
@@ -177,13 +158,13 @@ function! s:RunScriptImpl(lsargs, lrange, options)
         endif
         let consumed =1
     endif
-endfunction
+endfunction "}}}
 
 
 "
 " run current buffer as a script file 
 "
-function! s:RunCurrentBufferAsScript(cmd, bufheader, lsargs, lrange)
+function! s:RunCurrentBufferAsScript(cmd, bufheader, lsargs, lrange) "{{{
     let buftitle=a:bufheader . " output"
     let fpath=expand("%")
     let fname=expand("%:t")
@@ -194,29 +175,29 @@ function! s:RunCurrentBufferAsScript(cmd, bufheader, lsargs, lrange)
         w%
         call s:RunScriptFile(a:cmd, fpath, buftitle, a:lsargs)
     endif
-endfunction
+endfunction "}}}
 
 " if an interactive buffer (which is tied to current buffer) is alive,
 " returns bufnr, otherwise returns 0
-function! s:GetAliveInteraciveBufferNumber()
+function! s:GetAliveInteraciveBufferNumber() "{{{
     if exists("b:liteRunner_interactive_bufnr")
                 \ && buflisted(b:liteRunner_interactive_bufnr)
                 \ && bufloaded(b:liteRunner_interactive_bufnr)
         return b:liteRunner_interactive_bufnr
     endif
     return 0
-endfunction
+endfunction "}}}
 
 let s:liteRunner_conque_term_registered = 0
-function! s:RegisterCallbacks()
+function! s:RegisterCallbacks() "{{{
     if !s:liteRunner_conque_term_registered
         call conque_term#register_function('after_startup', 'liteRunner#AfterStartupConqueTerm')
         let s:liteRunner_conque_term_registered = 1
     endif
-endfunction
+endfunction "}}}
 
 
-function! liteRunner#AfterStartupConqueTerm(conqterm)
+function! liteRunner#AfterStartupConqueTerm(conqterm) "{{{
     let conq = a:conqterm
     "call s:echo_warn('after startup idx='. conq['idx'])
     if exists('b:liteRunner_input_queue') && !empty(b:liteRunner_input_queue)
@@ -228,25 +209,25 @@ function! liteRunner#AfterStartupConqueTerm(conqterm)
         unlockvar b:liteRunner_input_queue
     endif
     let b:liteRunner_conque_term_loaded = 1
-endfunction
+endfunction "}}}
 
-function! s:echo_warn(msg)
+function! s:echo_warn(msg) "{{{
     echohl WarningMsg | echo a:msg | echohl None
-endfunction
+endfunction "}}}
 
-function! s:EnqueInputOfConqueTerm(conqterm, text_or_lines)
-    call s:echo_warn('Enqueued.')
-    if !exists('b:liteRunner_input_queue')
-        let b:liteRunner_input_queue = []
-    endif
-    lockvar b:liteRunner_input_queue 1
-    let b:liteRunner_input_queue += text_or_lines
-    unlockvar b:liteRunner_input_queue
-endfunction
+"function! s:EnqueInputOfConqueTerm(conqterm, text_or_lines) "{{{
+"    call s:echo_warn('Enqueued.')
+"    if !exists('b:liteRunner_input_queue')
+"        let b:liteRunner_input_queue = []
+"    endif
+"    lockvar b:liteRunner_input_queue 1
+"    let b:liteRunner_input_queue += text_or_lines
+"    unlockvar b:liteRunner_input_queue
+"endfunction "}}}
 
 
 " wait to stable input
-function! s:WaitUntilCannotRead(conqterm, timeout, step)
+function! s:WaitUntilCannotRead(conqterm, timeout, step) "{{{
     let conq = a:conqterm
     let elaps = 0
     while a:timeout > elaps
@@ -258,15 +239,15 @@ function! s:WaitUntilCannotRead(conqterm, timeout, step)
         endif
         let elaps += a:step
     endwhile
-endfunction
+endfunction "}}}
 
 " input to conque_term
-function! s:InputToConqueTerm(conqterm, text_or_lines)
+function! s:InputToConqueTerm(conqterm, text_or_lines) "{{{
     let conq = a:conqterm
     let text_or_lines = a:text_or_lines
 
     if !exists("b:liteRunner_conque_term_loaded")
-        call EnqueInputOfConqueTerm(conq, text_or_lines)
+        "call EnqueInputOfConqueTerm(conq, text_or_lines)
         return
     endif
 
@@ -283,24 +264,37 @@ function! s:InputToConqueTerm(conqterm, text_or_lines)
         call conq.read(100)
         "call s:WaitUntilCannotRead(conq, 500, 1)
     endif
-endfunction
+endfunction "}}}
 
 " returns list [bufnr, conque_term_idx]
-function! s:PrepareInteractiveBuffer(cmd, waits)
+function! s:PrepareInteractiveBuffer(cmd, waits) "{{{
+    let interactive_prog = s:ChecksPrerequisite()
+    if empty(interactive_prog)
+        return []
+    endif
+
+    if interactive_prog['conqterm'] == 1
+        return s:PrepareInteractiveBufferWithConqueTerm(a:cmd, a:waits)
+    elseif interactive_prog['vimshell'] == 1
+        return s:PrepareInteractiveBufferWithVimShell(a:cmd, a:waits)
+    endif
+endfunction "}}}
+
+function! s:PrepareInteractiveBufferWithConqueTerm(cmd, waits) "{{{
     call s:RegisterCallbacks()
     let cbufno = bufnr('%')
     let ibufno = s:GetAliveInteraciveBufferNumber()
     if ibufno
-        let idx=getbufvar(cbufno, "liteRunner_conque_term_index")
-        if !empty(idx)
-            let conq = conque_term#get_instance(idx)
-            if !empty(conq) && get(conq, 'active', 0)
-                        \ && (get(conq, 'command', '') == a:cmd)
-                "already alive
-                if !g:liteRunner_ConqueTerm_renew_everytime
+        if !g:liteRunner_interactive_buffer_renew_everytime
+            let idx=getbufvar(cbufno, "liteRunner_conque_term_index")
+            if !empty(idx)
+                let conq = conque_term#get_instance(idx)
+                if !empty(conq) && get(conq, 'active', 0)
+                            \ && (get(conq, 'command', '') == a:cmd)
+                    "already alive
                     return [ibufno,idx] "reuse
+                    "call conq.close() " happens mapping errors
                 endif
-                "call conq.close() " happens mapping errors
             endif
         endif
         execute ibufno."bwipeout!"
@@ -311,12 +305,14 @@ function! s:PrepareInteractiveBuffer(cmd, waits)
         if exists("g:liteRunner_ConqueTerm_command")
             execute g:liteRunner_ConqueTerm_command . ' ' . a:cmd
         else
-            call conque_term#open(a:cmd, ['below split', 'resize '.
-                        \ g:liteRunner_windowheight_max])
+            call conque_term#open(a:cmd, [g:liteRunner_buffer_split_command])
         endif
         " if buffer moved, that is succeeded to execute the program (maybe)
         if cbufno != bufnr('%')
+            "resize buffer height
+            execute ':resize ' . g:liteRunner_windowheight_max
             let ibufno = bufnr('%')
+            call setbufvar(ibufno, "liteRunner_ibuf_is_conqueterm", 1)
             call setbufvar(cbufno, "liteRunner_interactive_bufnr", ibufno)
             let conq = conque_term#get_instance()
             let idx = get(conq, 'idx', 0)
@@ -336,10 +332,65 @@ function! s:PrepareInteractiveBuffer(cmd, waits)
     endif
 
     return []
-endfunction
+endfunction "}}}
+
+function! s:PrepareInteractiveBufferWithVimShell(cmd, waits) "{{{
+    let cbufno = bufnr('%')
+    let ibufno = s:GetAliveInteraciveBufferNumber()
+    if ibufno
+        if !g:liteRunner_interactive_buffer_renew_everytime
+            let vimshell=getbufvar(ibufno, "interactive")
+            if !empty(vimshell)
+                let is_valid = get(get(vimshell, 'process', {}), 'is_valid', 0)
+                if is_valid " 0 means already exited
+                    if a:cmd == join(get(vimshell, 'args', ''), ' ')
+                        return [ibufno, vimshell]
+                    endif
+                endif
+            else
+                "call s:echo_warn('*** VIMSHELL could not get ***')
+            endif
+        endif
+        execute ibufno."bwipeout!"
+        let ibufno = 0
+    endif
+
+    if !ibufno
+        let svvimshell_split_command = g:vimshell_split_command
+        let g:vimshell_split_command = g:liteRunner_buffer_split_command
+        if exists("g:liteRunner_VimShell_command")
+            execute g:liteRunner_VimShell_command . ' ' . a:cmd
+        else
+            execute ':VimShellInteractive ' . a:cmd
+        endif
+        let g:vimshell_split_command = svvimshell_split_command
+        " if buffer moved, that is succeeded to execute the program (maybe)
+        if cbufno != bufnr('%')
+            "resize buffer height
+            execute ':resize ' . g:liteRunner_windowheight_max
+            let ibufno = bufnr('%')
+            call setbufvar(ibufno, "liteRunner_ibuf_is_vimshell", 1)
+            call setbufvar(cbufno, "liteRunner_interactive_bufnr", ibufno)
+            let vimshell = getbufvar(ibufno, "interactive")
+            "let idx = get(conq, 'idx', 0)
+            "call setbufvar(cbufno, "liteRunner_conque_term_index", idx)
+            call s:SetOwnerBuffer(ibufno, cbufno)
+            " set syntax same as the owners
+            execute 'setlocal syntax=' . getbufvar(cbufno, '&syntax')
+            if has('localmap')
+                " buffer local map <CR> jump back to previous window
+                "nnoremap <silent> <buffer> <CR> :wincmd p<CR>
+                nnoremap <silent> <buffer> <CR> :call liteRunner#JumpToOwnerBuffer()<CR>
+            endif
+            return [ibufno, vimshell]
+        endif
+    endif
+
+    return []
+endfunction "}}}
 
 " returns string or list of lines
-function! s:GetPassingTextOrLines(lrange, mode, invisual)
+function! s:GetPassingTextOrLines(lrange, mode, invisual) "{{{
     let pass_mode = a:mode
     if pass_mode == 0 | return '' | endif
 
@@ -367,20 +418,51 @@ function! s:GetPassingTextOrLines(lrange, mode, invisual)
     endif
 
     return ''
-endfunction
+endfunction "}}}
+
+"
+" Checks prerequisite
+"
+function! s:ChecksPrerequisite() "{{{
+    let uses_conqterm = 0
+    let uses_vimshell = 0
+    if exists('g:liteRunner_uses_ConqueTerm') && g:liteRunner_uses_ConqueTerm
+        if !exists(':ConqueTerm')
+            call s:echo_warn('ConqueTerm plugin required!')
+            return 0
+        endif
+        let uses_conqterm = 1
+    elseif exists('g:liteRunner_uses_VimShell') && g:liteRunner_uses_VimShell
+        if !exists(':VimShell')
+            call s:echo_warn('VimShell plugin required!')
+            return 0
+        endif
+        let uses_vimshell = 1
+    elseif exists(':ConqueTerm')
+        let uses_conqterm = 1
+    elseif exists(':VimShell')
+        let uses_vimshell = 1
+    else
+        call s:echo_warn('ConqueTerm or VimShell required!')
+        return 0
+    endif
+
+    return {'conqterm' : uses_conqterm, 'vimshell' : uses_vimshell}
+    
+endfunction "}}}
 
 "
 " run contents of current buffer interactively
 "
-function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEntireContent, invisual)
-    if !exists(':ConqueTerm')
-        call s:echo_warn('ConqueTerm plugin required!')
+function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEntireContent, invisual) "{{{
+    let interactive_prog = s:ChecksPrerequisite()
+    if empty(interactive_prog)
         return
     endif
 
     let pass_mode = a:withEntireContent ? 3 :
-                \ exists("g:liteRunner_ConqueTerm_content_pass_mode") ?
-                \ g:liteRunner_ConqueTerm_content_pass_mode : 1
+                \ exists("g:liteRunner_interactive_content_pass_mode") ?
+                \ g:liteRunner_interactive_content_pass_mode : 1
     let text_or_lines = s:GetPassingTextOrLines(a:lrange, pass_mode, a:invisual)
     let cmd=s:PreprocessCommandLine(a:cmd)
     " expands (%) in cmd
@@ -394,52 +476,62 @@ function! s:RunCurrentBufferInteractively(cmd, bufheader, lsargs, lrange, withEn
             execute winnr . 'wincmd w'
         endif
 
-        "let svmode = mode()
-        "change to normal mode before write something
         stopinsert
-        "if svmode == 'i'
-            "stopinsert
-        "endif
         
         " do input
+        call s:InputToInteractiveBuffer(lbufspec, text_or_lines)
+
+        startinsert!
+    endif
+endfunction "}}}
+
+
+function! s:InputToInteractiveBuffer(lbufspec, text_or_lines) "{{{
+    let lbufspec = a:lbufspec
+    let text_or_lines = a:text_or_lines
+    if getbufvar(lbufspec[0], 'liteRunner_ibuf_is_conqueterm')
         let conq = conque_term#get_instance(lbufspec[1])
-        "call s:echo_warn(conq)
-        "call s:echo_warn('liteRunner_conque_term_loaded='. getbufvar('%', 'liteRunner_conque_term_loaded'))
         if !empty(conq) && !empty(text_or_lines)
             call s:InputToConqueTerm(conq, text_or_lines)
         endif
-
-        " restore insert mode
-        "if svmode == 'i'
-            "startinsert!
-        "endif
-        startinsert!
+    elseif getbufvar(lbufspec[0], 'liteRunner_ibuf_is_vimshell')
+        if !empty(text_or_lines) && type(text_or_lines) == type('')
+            execute ':VimShellSendString ' . text_or_lines
+            "call vimshell#interactive#send_string(text_or_lines)
+        elseif type(text_or_lines) == type([])
+            execute ':VimShellSendString ' . join(text_or_lines, "\n")
+            "for L in text_or_lines
+            "    call vimshell#interactive#send_string(L)
+            "endfor
+        endif
+    else
     endif
-endfunction
+
+endfunction "}}}
 
 " get program name from cmdline string
 " e.g '/usr/local/bin/python2.3' -> python2.3
 " e.g '/usr/bin/env python' -> python
 " e.g 'python3.2.exe' -> python3.2
-function! s:GetProgname(cmd)
+function! s:GetProgname(cmd) "{{{
     let lcmd=split(a:cmd, ' ')
     let pn=fnamemodify(
                 \ len(lcmd) > 1 && fnamemodify(lcmd[0], ':t') == 'env' ? lcmd[1] : lcmd[0],
                 \ ':t')
     return fnamemodify(pn, ':e') == 'exe' ? fnamemodify(pn, ':r') : pn
-endfunction
+endfunction "}}}
 
 " if (%) in src, it replaces into path
-function! s:ExpandWithSpecifiedPath(str, path)
+function! s:ExpandWithSpecifiedPath(str, path) "{{{
     let lst=matchlist(a:str, '\([^(]*\)\((%[^)]*)\)\(.*\)')
     if empty(lst)
         return a:str
     endif
     return lst[1] . fnamemodify(a:path, lst[2][2:-2]) . s:ExpandWithSpecifiedPath(lst[3], a:path)
-endfunction
+endfunction "}}}
 
 " find a buffer with title
-function! s:FindBufferWithTitle(title)
+function! s:FindBufferWithTitle(title) "{{{
     "try to find via bufnr
     let nr=bufnr(a:title)
     if nr > 0 && bufname(nr) == a:title
@@ -452,10 +544,10 @@ function! s:FindBufferWithTitle(title)
         endif
     endfor
     return -1
-endfunction
+endfunction "}}}
 
 " search in g:liteRunner_prognames_efms_dict
-function! s:GetCustomErrorFormatByProgname(progname)
+function! s:GetCustomErrorFormatByProgname(progname) "{{{
     "try to get with detail name to more common name
     "e.g [python2.6, python2, python]
     let lpatterns = []
@@ -477,22 +569,22 @@ function! s:GetCustomErrorFormatByProgname(progname)
         endif
     endfor
     return [] "not found
-endfunction
+endfunction "}}}
 
 "
 " check whether a valid entry in Quickfix
 " now checks line number of entries
-function! s:ContainsValidEntryInQuickfix()
+function! s:ContainsValidEntryInQuickfix() "{{{
     for ent in getqflist()
         if get(ent, 'lnum', 0) > 0
             return 1
         endif
     endfor
     return 0
-endfunction
+endfunction "}}}
 
 " set up an output buffer
-function! s:PrepareOutputBuffer(buftitle)
+function! s:PrepareOutputBuffer(buftitle) "{{{
     let ownerbufno = bufnr('%')
     execute '5new ' . a:buftitle
     execute 'resize '. g:liteRunner_windowheight_default
@@ -510,12 +602,12 @@ function! s:PrepareOutputBuffer(buftitle)
         nnoremap <silent> <buffer> <CR> :call liteRunner#JumpToOwnerBuffer()<CR>
     endif
     return bufno
-endfunction
+endfunction "}}}
 
 "
 " run script file and the result shown in another window
 "
-function! s:RunScriptFile(cmd, fpath, buftitle, lsargs)
+function! s:RunScriptFile(cmd, fpath, buftitle, lsargs) "{{{
     let cmd=a:cmd
     let arg=len(a:lsargs) > 0 ? ' ' . join(a:lsargs, ' ') : ''
     let buftitle=a:buftitle
@@ -592,25 +684,25 @@ function! s:RunScriptFile(cmd, fpath, buftitle, lsargs)
             execute 'wincmd p'
         endif
     endif
-endfunction
+endfunction "}}}
 
 " make relationship between buffers
-function! s:SetOwnerBuffer(childno, ownerno)
+function! s:SetOwnerBuffer(childno, ownerno) "{{{
     if bufexists(a:childno) && bufexists(a:ownerno)
         call setbufvar(a:childno, "liteRunner_owner_bufnr", a:ownerno)
     endif
-endfunction
+endfunction "}}}
 
 " jump to the owner buffer
-function! liteRunner#JumpToOwnerBuffer()
+function! liteRunner#JumpToOwnerBuffer() "{{{
     let ownerno = getbufvar('%', "liteRunner_owner_bufnr")
     if !empty(ownerno) && bufexists(ownerno)
         execute bufwinnr(ownerno) . 'wincmd w'
     endif
-endfunction
+endfunction "}}}
 
 "make preprocess to cmdline before executing
-function! s:PreprocessCommandLine(cmd)
+function! s:PreprocessCommandLine(cmd) "{{{
     if has("win32")
         "TODO executable() check needed
         " in Windows cannot work /usr/bin/env
@@ -622,13 +714,13 @@ function! s:PreprocessCommandLine(cmd)
         endif
     endif
     return a:cmd
-endfunction
+endfunction "}}}
 
 " vim:ts=8:sts=4:sw=4:et
 plugin/liteRunner.vim	[[[1
-208
+230
 " File: plugin/liteRunner.vim
-" Version: 0.4
+" Version: 0.5
 "
 " liteRunner plugin
 "
@@ -662,6 +754,11 @@ if !exists("g:liteRunner_checks_errors_always")
     let g:liteRunner_checks_errors_always=0
 endif
 
+" command when buffer split
+if !exists("g:liteRunner_buffer_split_command")
+    let g:liteRunner_buffer_split_command="belowright split"
+endif
+
 " output window height default
 if !exists("g:liteRunner_windowheight_default")
     let g:liteRunner_windowheight_default=5
@@ -672,19 +769,34 @@ if !exists("g:liteRunner_windowheight_max")
     let g:liteRunner_windowheight_max=10
 endif
 
+" a flag either use ConqueTerm or not for interactive mode
+if !exists("g:liteRunner_uses_ConqueTerm")
+    let g:liteRunner_uses_ConqueTerm = 0
+endif
+
+" a flag either use VimShell or not for interactive mode
+if !exists("g:liteRunner_uses_VimShell")
+    let g:liteRunner_uses_VimShell = 0
+endif
+
 " ConqueTerm Command
-"if !exists("g:liteRunner_ConqueTerm_command") && exists(":ConqueTerm")
+"if !exists("g:liteRunner_ConqueTerm_command")
 "    let g:liteRunner_ConqueTerm_command='ConqueTermSplit'
 "endif
 
-" flag renew ConqueTerm everytime or not
-if !exists("g:liteRunner_ConqueTerm_renew_everytime")
-    let g:liteRunner_ConqueTerm_renew_everytime=0
+" flag renew interactive buffer everytime or not
+if !exists("g:liteRunner_interactive_buffer_renew_everytime")
+    let g:liteRunner_interactive_buffer_renew_everytime=0
+endif
+
+" VimShell Command
+if !exists("g:liteRunner_VimShell_command")
+    let g:liteRunner_VimShell_command='VimShellInteractive'
 endif
 
 " 0=never passing, 1=selection only, 2=entire of content
-if !exists("g:liteRunner_ConqueTerm_content_pass_mode")
-    let g:liteRunner_ConqueTerm_content_pass_mode=1
+if !exists("g:liteRunner_interactive_content_pass_mode")
+    let g:liteRunner_interactive_content_pass_mode=1
 endif
 
 "
@@ -694,29 +806,30 @@ endif
 " if (%) in command string, it replaced with editing file path.
 " e.g. script -i=(%) --dir=(%:h)
 if !exists("g:liteRunner_ftyps_cmds_dict")
-    let ENVPROG='/usr/bin/env'
-    if !executable(ENVPROG)
+    let s:ENVPROG='/usr/bin/env'
+    if !executable(s:ENVPROG)
         " search env in path
-        let ENVPROG = glob('`which env`')
+        let s:ENVPROG = glob('`which env`')
     endif
-    let ENV=''
-    if !empty(ENVPROG)
-        let ENV = ENVPROG.' '
+    let s:ENV=''
+    if !empty(s:ENVPROG)
+        let s:ENV = s:ENVPROG.' '
     endif
+    unlet s:ENVPROG
     "TODO: maintain list
     let g:liteRunner_ftyps_cmds_dict={
-        \'awk'      : [ENV.'awk -f'],
-        \'lua'      : [ENV.'lua'],
-        \'perl'     : [ENV.'perl'],
-        \'php'      : [ENV.'php'],
-        \'python'   : [ENV.'python'],
-        \'ruby'     : [ENV.'ruby', ENV.'irb'],
-        \'scheme'   : [ENV.'gosh', ENV.'gosh -i'],
-        \'sed'      : [ENV.'sed -f'],
-        \'sh'       : [ENV.'sh'],
-        \'csh'      : [ENV.'csh'],
-        \'tcsh'     : [ENV.'tcsh'],
-        \'zsh'      : [ENV.'zsh'],
+        \'awk'      : [s:ENV.'awk -f'],
+        \'lua'      : [s:ENV.'lua'],
+        \'perl'     : [s:ENV.'perl'],
+        \'php'      : [s:ENV.'php'],
+        \'python'   : [s:ENV.'python'],
+        \'ruby'     : [s:ENV.'ruby', s:ENV.'irb'],
+        \'scheme'   : [s:ENV.'gosh', s:ENV.'gosh -i'],
+        \'sed'      : [s:ENV.'sed -f'],
+        \'sh'       : [s:ENV.'sh'],
+        \'csh'      : [s:ENV.'csh'],
+        \'tcsh'     : [s:ENV.'tcsh'],
+        \'zsh'      : [s:ENV.'zsh'],
         \}
 
     if has('unix')
@@ -727,6 +840,7 @@ if !exists("g:liteRunner_ftyps_cmds_dict")
         let g:liteRunner_ftyps_cmds_dict['html'] = ['open']
     endif
     "let g:liteRunner_ftyps_cmds_dict['scheme'] = ['mit-scheme --load (%)']
+    unlet s:ENV
 endif
 
 "

@@ -1,5 +1,5 @@
 " File: plugin/liteRunner.vim
-" Version: 0.4
+" Version: 0.5
 "
 " liteRunner plugin
 "
@@ -33,6 +33,11 @@ if !exists("g:liteRunner_checks_errors_always")
     let g:liteRunner_checks_errors_always=0
 endif
 
+" command when buffer split
+if !exists("g:liteRunner_buffer_split_command")
+    let g:liteRunner_buffer_split_command="belowright split"
+endif
+
 " output window height default
 if !exists("g:liteRunner_windowheight_default")
     let g:liteRunner_windowheight_default=5
@@ -43,19 +48,34 @@ if !exists("g:liteRunner_windowheight_max")
     let g:liteRunner_windowheight_max=10
 endif
 
+" a flag either use ConqueTerm or not for interactive mode
+if !exists("g:liteRunner_uses_ConqueTerm")
+    let g:liteRunner_uses_ConqueTerm = 0
+endif
+
+" a flag either use VimShell or not for interactive mode
+if !exists("g:liteRunner_uses_VimShell")
+    let g:liteRunner_uses_VimShell = 0
+endif
+
 " ConqueTerm Command
-"if !exists("g:liteRunner_ConqueTerm_command") && exists(":ConqueTerm")
+"if !exists("g:liteRunner_ConqueTerm_command")
 "    let g:liteRunner_ConqueTerm_command='ConqueTermSplit'
 "endif
 
-" flag renew ConqueTerm everytime or not
-if !exists("g:liteRunner_ConqueTerm_renew_everytime")
-    let g:liteRunner_ConqueTerm_renew_everytime=0
+" flag renew interactive buffer everytime or not
+if !exists("g:liteRunner_interactive_buffer_renew_everytime")
+    let g:liteRunner_interactive_buffer_renew_everytime=0
+endif
+
+" VimShell Command
+if !exists("g:liteRunner_VimShell_command")
+    let g:liteRunner_VimShell_command='VimShellInteractive'
 endif
 
 " 0=never passing, 1=selection only, 2=entire of content
-if !exists("g:liteRunner_ConqueTerm_content_pass_mode")
-    let g:liteRunner_ConqueTerm_content_pass_mode=1
+if !exists("g:liteRunner_interactive_content_pass_mode")
+    let g:liteRunner_interactive_content_pass_mode=1
 endif
 
 "
@@ -65,29 +85,30 @@ endif
 " if (%) in command string, it replaced with editing file path.
 " e.g. script -i=(%) --dir=(%:h)
 if !exists("g:liteRunner_ftyps_cmds_dict")
-    let ENVPROG='/usr/bin/env'
-    if !executable(ENVPROG)
+    let s:ENVPROG='/usr/bin/env'
+    if !executable(s:ENVPROG)
         " search env in path
-        let ENVPROG = glob('`which env`')
+        let s:ENVPROG = glob('`which env`')
     endif
-    let ENV=''
-    if !empty(ENVPROG)
-        let ENV = ENVPROG.' '
+    let s:ENV=''
+    if !empty(s:ENVPROG)
+        let s:ENV = s:ENVPROG.' '
     endif
+    unlet s:ENVPROG
     "TODO: maintain list
     let g:liteRunner_ftyps_cmds_dict={
-        \'awk'      : [ENV.'awk -f'],
-        \'lua'      : [ENV.'lua'],
-        \'perl'     : [ENV.'perl'],
-        \'php'      : [ENV.'php'],
-        \'python'   : [ENV.'python'],
-        \'ruby'     : [ENV.'ruby', ENV.'irb'],
-        \'scheme'   : [ENV.'gosh', ENV.'gosh -i'],
-        \'sed'      : [ENV.'sed -f'],
-        \'sh'       : [ENV.'sh'],
-        \'csh'      : [ENV.'csh'],
-        \'tcsh'     : [ENV.'tcsh'],
-        \'zsh'      : [ENV.'zsh'],
+        \'awk'      : [s:ENV.'awk -f'],
+        \'lua'      : [s:ENV.'lua'],
+        \'perl'     : [s:ENV.'perl'],
+        \'php'      : [s:ENV.'php'],
+        \'python'   : [s:ENV.'python'],
+        \'ruby'     : [s:ENV.'ruby', s:ENV.'irb'],
+        \'scheme'   : [s:ENV.'gosh', s:ENV.'gosh -i'],
+        \'sed'      : [s:ENV.'sed -f'],
+        \'sh'       : [s:ENV.'sh'],
+        \'csh'      : [s:ENV.'csh'],
+        \'tcsh'     : [s:ENV.'tcsh'],
+        \'zsh'      : [s:ENV.'zsh'],
         \}
 
     if has('unix')
@@ -98,6 +119,7 @@ if !exists("g:liteRunner_ftyps_cmds_dict")
         let g:liteRunner_ftyps_cmds_dict['html'] = ['open']
     endif
     "let g:liteRunner_ftyps_cmds_dict['scheme'] = ['mit-scheme --load (%)']
+    unlet s:ENV
 endif
 
 "
