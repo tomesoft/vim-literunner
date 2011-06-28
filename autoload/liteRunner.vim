@@ -167,7 +167,9 @@ function! s:RunCurrentBufferAsScript(cmd, bufheader, lsargs, lrange) "{{{
         call s:echo_warn("save at first!!")
     else
         let buftitle = "[" . buftitle . "][" . fname . "]"
-        w%
+        if !&readonly
+            execute ':write%'
+        endif
         call s:RunScriptFile(a:cmd, fpath, buftitle, a:lsargs)
     endif
 endfunction "}}}
