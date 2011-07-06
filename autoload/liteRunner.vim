@@ -91,6 +91,17 @@ function! liteRunner#RunScriptInteractivelyWithEntireOfContent() "{{{
                 \{'interactively':1, 'withEntireContent':1})
 endfunction "}}}
 
+" primary try to get from current buffer local
+" secondary try to get from global
+function! s:GetVariable(name, fallbackval)
+    if exists('b:'.a:name)
+        return eval('b:'.a:name)
+    endif
+    if exists('g:'.a:name)
+        return eval('g:'.a:name)
+    endif
+    return a:fallbackval
+endfunction
 
 " analyze the shebang line and returns their command line string
 function! s:GetShebangCommand() "{{{
@@ -114,8 +125,10 @@ endfunction "}}}
 "Get command to execute on a specified mode
 function! s:GetCommand(interactively) "{{{
     let interactively = !empty(a:interactively)
-    let cmd = ''
-    let repl = getbufvar('%', 'liteRunner_REPL')
+    "let cmd = getbufvar('%', 'liteRunner_PROG')
+    "let repl = getbufvar('%', 'liteRunner_REPL')
+    let cmd = s:GetVariable('liteRunner_PROG', '')
+    let repl = s:GetVariable('liteRunner_REPL', '')
     if interactively && !empty(repl)
         let cmd = repl
     endif
